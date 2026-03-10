@@ -309,10 +309,30 @@ public:
     // TODO: Give this a better name!!
     void clear()
     {
+        beginFrameInternal(gpu::LoadAction::clear);
+    }
+
+    /**
+     * Begin a frame without clearing the framebuffer. Use this
+     * instead of clear() when sharing a WebGL context with another
+     * renderer (e.g. PixiJS) whose output should be preserved.
+     */
+    void beginOverlayFrame()
+    {
+        beginFrameInternal(gpu::LoadAction::preserveRenderTarget);
+    }
+
+private:
+    void beginFrameInternal(gpu::LoadAction loadAction)
+    {
+        // NOTE: No ScopedGLContextMakeCurrent here. The JS wrapper
+        // (like clear()'s wrapper) is responsible for calling
+        // GL.makeContextCurrent() and leaving it set for the
+        // duration of the begin/draw/flush sequence.
         RenderContext::FrameDescriptor frameDescriptor = {
             .renderTargetWidth = m_renderTarget->width(),
             .renderTargetHeight = m_renderTarget->height(),
-            .loadAction = gpu::LoadAction::clear,
+            .loadAction = loadAction,
             .clearColor = 0,
         };
         if (m_renderTarget->sampleCount() > 1)
@@ -329,6 +349,8 @@ public:
         m_renderContext->beginFrame(std::move(frameDescriptor));
         ++m_currentFrameID;
     }
+
+public:
 
     void saveClipRect(float l, float t, float r, float b)
     {
@@ -392,6 +414,28 @@ public:
     {
         ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
         m_renderContext->flush({.renderTarget = m_renderTarget.get()});
+    }
+
+    /**
+     * Re-binds Rive's internal textures and invalidates the GL state
+     * cache. Call this before Rive renders when another renderer (e.g.
+     * PixiJS) has been using the shared WebGL context.
+     */
+    void invalidateGLState()
+    {
+        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+        renderContextGL()->invalidateGLState();
+    }
+
+    /**
+     * Unbinds all Rive-internal VAOs, buffers, framebuffers, and
+     * textures. Call this after Rive renders, before yielding the
+     * shared WebGL context to another renderer (e.g. PixiJS).
+     */
+    void unbindGLInternalResources()
+    {
+        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+        renderContextGL()->unbindGLInternalResources();
     }
 
     // Delete our corresponding PLS buffer when a WebGL2RenderBuffer is deleted.
@@ -535,7 +579,10 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
         .function("flush", &WebGL2Renderer::flush)
         .function("resize", &WebGL2Renderer::resize)
         .function("saveClipRect", &WebGL2Renderer::saveClipRect)
-        .function("restoreClipRect", &WebGL2Renderer::restoreClipRect);
+        .function("restoreClipRect", &WebGL2Renderer::restoreClipRect)
+        .function("invalidateGLState", &WebGL2Renderer::invalidateGLState)
+        .function("unbindGLInternalResources", &WebGL2Renderer::unbindGLInternalResources)
+        .function("beginOverlayFrame", &WebGL2Renderer::beginOverlayFrame);
     class_<RenderImage>("RenderImage")
         .function("unref", &RenderImageWrapper::unref)
         .allow_subclass<RenderImageWrapper>("RenderImageWrapper");
