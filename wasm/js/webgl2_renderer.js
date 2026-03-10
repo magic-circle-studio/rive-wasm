@@ -392,6 +392,20 @@ Module["onRuntimeInitialized"] = function () {
     cppClear.call(this);
   };
 
+  const cppBeginOverlayFrame = Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"];
+  Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"] = function () {
+    // Same context/resize handling as clear(), but preserves the
+    // existing framebuffer content for shared-context rendering.
+    GL.makeContextCurrent(this._handle);
+    const canvas = this._canvas;
+    if (this._width != canvas.width || this._height != canvas.height) {
+      this.resize(canvas.width, canvas.height);
+      this._width = canvas.width;
+      this._height = canvas.height;
+    }
+    cppBeginOverlayFrame.call(this);
+  };
+
   Module["decodeImage"] = function (bytes, onComplete) {
     let image = Module["decodeWebGL2Image"](bytes);
     onComplete(image);

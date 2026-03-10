@@ -164,6 +164,24 @@ export declare class RendererWrapper {
   clear(): void;
   delete(): void;
   flush(): void;
+  /**
+   * Re-binds Rive's internal textures and invalidates the GL state
+   * cache. Call before Rive renders when another renderer (e.g.
+   * PixiJS) has been using the shared WebGL context.
+   */
+  invalidateGLState(): void;
+  /**
+   * Unbinds all Rive-internal VAOs, buffers, framebuffers, and
+   * textures. Call after Rive renders, before yielding the shared
+   * WebGL context to another renderer (e.g. PixiJS).
+   */
+  unbindGLInternalResources(): void;
+  /**
+   * Begin a frame without clearing the framebuffer. Use instead of
+   * clear() when sharing a WebGL context with another renderer
+   * whose output should be preserved.
+   */
+  beginOverlayFrame(): void;
   translate(x: number, y: number): void;
   rotate(angle: number): void;
 }
