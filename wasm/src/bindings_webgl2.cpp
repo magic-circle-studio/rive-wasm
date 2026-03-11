@@ -283,6 +283,7 @@ public:
     {
         ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
         m_plsSynchronizedBuffers.clear();
+        m_textureRenderTarget = nullptr;
         m_renderTarget = nullptr;
         m_renderContext = nullptr;
     }
@@ -329,13 +330,24 @@ private:
         // (like clear()'s wrapper) is responsible for calling
         // GL.makeContextCurrent() and leaving it set for the
         // duration of the begin/draw/flush sequence.
+        auto* target = activeRenderTarget();
         RenderContext::FrameDescriptor frameDescriptor = {
-            .renderTargetWidth = m_renderTarget->width(),
-            .renderTargetHeight = m_renderTarget->height(),
+            .renderTargetWidth = target->width(),
+            .renderTargetHeight = target->height(),
             .loadAction = loadAction,
             .clearColor = 0,
         };
-        if (m_renderTarget->sampleCount() > 1)
+        if (m_textureRenderTarget)
+        {
+            // Texture targets don't have canvas-level MSAA. Use
+            // internal MSAA when PLS is not available.
+            if (!m_renderContext->platformFeatures().supportsRasterOrderingMode &&
+                !m_renderContext->platformFeatures().supportsAtomicMode)
+            {
+                frameDescriptor.msaaSampleCount = 4;
+            }
+        }
+        else if (m_renderTarget->sampleCount() > 1)
         {
             // Use MSAA if we were given a canvas with 'antialias: true'.
             frameDescriptor.msaaSampleCount = m_renderTarget->sampleCount();
@@ -413,7 +425,33 @@ public:
     void flush()
     {
         ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
-        m_renderContext->flush({.renderTarget = m_renderTarget.get()});
+        m_renderContext->flush({.renderTarget = activeRenderTarget()});
+    }
+
+    /**
+     * Set an external WebGL texture as the render target. When set,
+     * clear()/beginOverlayFrame()/flush() render to this texture
+     * instead of the default framebuffer (canvas).
+     */
+    void setTargetTexture(GLuint textureId, int width, int height)
+    {
+        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+        if (!m_textureRenderTarget ||
+            m_textureRenderTarget->width() != (uint32_t)width ||
+            m_textureRenderTarget->height() != (uint32_t)height)
+        {
+            m_textureRenderTarget = make_rcp<TextureRenderTargetGL>(width, height);
+        }
+        m_textureRenderTarget->setTargetTexture(textureId);
+    }
+
+    /**
+     * Remove the external texture target, reverting to default
+     * framebuffer (canvas) rendering.
+     */
+    void clearTargetTexture()
+    {
+        m_textureRenderTarget = nullptr;
     }
 
     /**
@@ -452,10 +490,20 @@ private:
         return synchronizedBuffer.get();
     }
 
+    RenderTarget* activeRenderTarget() const
+    {
+        if (m_textureRenderTarget)
+        {
+            return m_textureRenderTarget.get();
+        }
+        return m_renderTarget.get();
+    }
+
     const EMSCRIPTEN_WEBGL_CONTEXT_HANDLE m_contextGL = emscripten_webgl_get_current_context();
 
     std::unique_ptr<RenderContext> m_renderContext;
     rcp<FramebufferRenderTargetGL> m_renderTarget;
+    rcp<TextureRenderTargetGL> m_textureRenderTarget;
 
     std::map<PLSResourceID, PLSSynchronizedBuffer> m_plsSynchronizedBuffers;
 
@@ -582,7 +630,9 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
         .function("restoreClipRect", &WebGL2Renderer::restoreClipRect)
         .function("invalidateGLState", &WebGL2Renderer::invalidateGLState)
         .function("unbindGLInternalResources", &WebGL2Renderer::unbindGLInternalResources)
-        .function("beginOverlayFrame", &WebGL2Renderer::beginOverlayFrame);
+        .function("beginOverlayFrame", &WebGL2Renderer::beginOverlayFrame)
+        .function("_setTargetTexture", &WebGL2Renderer::setTargetTexture)
+        .function("_clearTargetTexture", &WebGL2Renderer::clearTargetTexture);
     class_<RenderImage>("RenderImage")
         .function("unref", &RenderImageWrapper::unref)
         .allow_subclass<RenderImageWrapper>("RenderImageWrapper");
