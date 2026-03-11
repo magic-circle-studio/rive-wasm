@@ -98,6 +98,10 @@ Module["onRuntimeInitialized"] = function () {
     renderer._gl = gl;
     var nativeDelete = renderer.delete;
     renderer.delete = function () {
+      if (this._externalTextureGLId) {
+        GL.textures[this._externalTextureGLId] = null;
+        this._externalTextureGLId = null;
+      }
       nativeDelete.call(this);
       GL.deleteContext(this._handle);
       this._handle = this._canvas = this._width = this._width = this._gl = null;
@@ -381,29 +385,59 @@ Module["onRuntimeInitialized"] = function () {
 
   const cppClear = Module["WebGL2Renderer"]["prototype"]["clear"];
   Module["WebGL2Renderer"]["prototype"]["clear"] = function () {
-    // Resize WebGL surface if the canvas size changed.
     GL.makeContextCurrent(this._handle);
-    const canvas = this._canvas;
-    if (this._width != canvas.width || this._height != canvas.height) {
-      this.resize(canvas.width, canvas.height);
-      this._width = canvas.width;
-      this._height = canvas.height;
+    // Only auto-resize from canvas when targeting the default framebuffer.
+    if (!this._externalTextureGLId) {
+      const canvas = this._canvas;
+      if (this._width != canvas.width || this._height != canvas.height) {
+        this.resize(canvas.width, canvas.height);
+        this._width = canvas.width;
+        this._height = canvas.height;
+      }
     }
     cppClear.call(this);
   };
 
   const cppBeginOverlayFrame = Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"];
   Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"] = function () {
-    // Same context/resize handling as clear(), but preserves the
-    // existing framebuffer content for shared-context rendering.
     GL.makeContextCurrent(this._handle);
-    const canvas = this._canvas;
-    if (this._width != canvas.width || this._height != canvas.height) {
-      this.resize(canvas.width, canvas.height);
-      this._width = canvas.width;
-      this._height = canvas.height;
+    // Only auto-resize from canvas when targeting the default framebuffer.
+    if (!this._externalTextureGLId) {
+      const canvas = this._canvas;
+      if (this._width != canvas.width || this._height != canvas.height) {
+        this.resize(canvas.width, canvas.height);
+        this._width = canvas.width;
+        this._height = canvas.height;
+      }
     }
     cppBeginOverlayFrame.call(this);
+  };
+
+  const cppSetTargetTexture = Module["WebGL2Renderer"]["prototype"]["_setTargetTexture"];
+  const cppClearTargetTexture = Module["WebGL2Renderer"]["prototype"]["_clearTargetTexture"];
+
+  Module["WebGL2Renderer"]["prototype"]["setTargetTexture"] = function (webglTexture, width, height) {
+    GL.makeContextCurrent(this._handle);
+    // Unregister previous external texture if any.
+    if (this._externalTextureGLId) {
+      GL.textures[this._externalTextureGLId] = null;
+      this._externalTextureGLId = null;
+    }
+    // Register the WebGLTexture in Emscripten's GL.textures table
+    // so C++ can reference it as a GLuint.
+    var id = GL.getNewId(GL.textures);
+    GL.textures[id] = webglTexture;
+    this._externalTextureGLId = id;
+    cppSetTargetTexture.call(this, id, width, height);
+  };
+
+  Module["WebGL2Renderer"]["prototype"]["clearTargetTexture"] = function () {
+    GL.makeContextCurrent(this._handle);
+    cppClearTargetTexture.call(this);
+    if (this._externalTextureGLId) {
+      GL.textures[this._externalTextureGLId] = null;
+      this._externalTextureGLId = null;
+    }
   };
 
   Module["decodeImage"] = function (bytes, onComplete) {

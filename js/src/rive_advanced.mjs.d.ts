@@ -182,6 +182,20 @@ export declare class RendererWrapper {
    * whose output should be preserved.
    */
   beginOverlayFrame(): void;
+  /**
+   * Set an external WebGL texture as the render target. When set,
+   * clear()/beginOverlayFrame()/flush() render to this texture
+   * instead of the default framebuffer (canvas).
+   *
+   * The texture must be on the same WebGL context. Rive does NOT
+   * own the texture — the caller manages its lifecycle.
+   */
+  setTargetTexture(texture: WebGLTexture, width: number, height: number): void;
+  /**
+   * Remove the external texture target, reverting to default
+   * framebuffer (canvas) rendering.
+   */
+  clearTargetTexture(): void;
   translate(x: number, y: number): void;
   rotate(angle: number): void;
 }
