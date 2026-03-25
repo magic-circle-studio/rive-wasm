@@ -199,6 +199,21 @@ export declare class RendererWrapper {
    * framebuffer (canvas) rendering.
    */
   clearTargetTexture(): void;
+  /**
+   * Create a RenderImage from an external WebGLTexture for zero-copy
+   * texture sharing. The returned image can be set on a data binding
+   * image property via ViewModelInstanceAssetImage.value().
+   *
+   * Rive takes ownership of the GL texture via adoptImageTexture —
+   * it will be deleted when the RenderImage is freed. The caller
+   * must ensure the RenderImage outlives any external use of the
+   * texture, or use a dedicated texture for Rive.
+   */
+  makeImageFromGLTexture(
+    texture: WebGLTexture,
+    width: number,
+    height: number
+  ): ImageInternal;
   translate(x: number, y: number): void;
   rotate(angle: number): void;
 }
