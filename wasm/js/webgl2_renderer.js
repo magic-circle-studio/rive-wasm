@@ -102,6 +102,12 @@ Module["onRuntimeInitialized"] = function () {
         GL.textures[this._externalTextureGLId] = null;
         this._externalTextureGLId = null;
       }
+      if (this._externalImageTextureGLIds) {
+        for (var i = 0; i < this._externalImageTextureGLIds.length; i++) {
+          GL.textures[this._externalImageTextureGLIds[i]] = null;
+        }
+        this._externalImageTextureGLIds = null;
+      }
       nativeDelete.call(this);
       GL.deleteContext(this._handle);
       this._handle = this._canvas = this._width = this._width = this._gl = null;
@@ -439,6 +445,30 @@ Module["onRuntimeInitialized"] = function () {
       this._externalTextureGLId = null;
     }
   };
+
+  const cppMakeImageFromGLTexture =
+    Module["WebGL2Renderer"]["prototype"]["_makeImageFromGLTexture"];
+
+  /**
+   * Create a RenderImage from an external WebGLTexture for zero-copy
+   * texture sharing. The returned image can be set on a data binding
+   * image property via ViewModelInstanceAssetImage.value().
+   *
+   * Rive takes ownership of the GL texture via adoptImageTexture —
+   * it will be deleted when the RenderImage is freed. Use a dedicated
+   * texture for Rive, not one shared with another renderer.
+   */
+  Module["WebGL2Renderer"]["prototype"]["makeImageFromGLTexture"] =
+    function (webglTexture, width, height) {
+      GL.makeContextCurrent(this._handle);
+      var id = GL.getNewId(GL.textures);
+      GL.textures[id] = webglTexture;
+      if (!this._externalImageTextureGLIds) {
+        this._externalImageTextureGLIds = [];
+      }
+      this._externalImageTextureGLIds.push(id);
+      return cppMakeImageFromGLTexture.call(this, id, width, height);
+    };
 
   Module["decodeImage"] = function (bytes, onComplete) {
     let image = Module["decodeWebGL2Image"](bytes);
