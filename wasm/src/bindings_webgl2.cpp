@@ -225,6 +225,15 @@ public:
                      encodedBytes.size());
     }
 
+    /**
+     * Create a pre-prepped WebGL2RenderImage from an existing GL texture.
+     * Skips the async decode step — the image is immediately ready to render.
+     * Defined out-of-line after WebGL2Renderer (needs renderContextGL()).
+     */
+    WebGL2RenderImage(WebGL2Renderer* renderer,
+                      EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context,
+                      GLuint textureId, int width, int height);
+
     ~WebGL2RenderImage()
     {
         ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
@@ -333,6 +342,8 @@ private:
     PLSResourceID m_mutationID = 0; // Tells when we are out of sync with the WebGL2BufferData.
 };
 
+class RenderImageWrapper; // Forward declaration for makeImageFromGLTexture return type.
+
 // Wraps a tightly coupled RiveRenderer and RenderContext, which are tied to a specific WebGL2
 // context.
 class WebGL2Renderer : public RiveRenderer
@@ -357,6 +368,7 @@ public:
         detachSession();
 #endif
         m_plsSynchronizedBuffers.clear();
+        m_textureRenderTarget = nullptr;
         m_renderTarget = nullptr;
         m_renderContext = nullptr;
     }
@@ -403,15 +415,41 @@ public:
         ++m_currentFrameID;
     }
 
+    void beginOverlayFrame()
+    {
+#if defined(RIVE_CANVAS) && defined(RIVE_ORE)
+        if (m_session != nullptr)
+        {
+            m_host.beginRecord(/*clear=*/false, /*color=*/0);
+            m_session->beginTargetFrame(m_screenTarget);
+            m_target = m_host.screenRenderer();
+            ++m_currentFrameID;
+            return;
+        }
+#endif
+        beginScreenFrame(gpu::LoadAction::preserveRenderTarget, 0);
+        ++m_currentFrameID;
+    }
+
     void beginScreenFrame(gpu::LoadAction loadAction, ColorInt clearColor)
     {
         RenderContext::FrameDescriptor frameDescriptor = {
-            .renderTargetWidth = m_renderTarget->width(),
-            .renderTargetHeight = m_renderTarget->height(),
+            .renderTargetWidth = activeRenderTarget()->width(),
+            .renderTargetHeight = activeRenderTarget()->height(),
             .loadAction = loadAction,
             .clearColor = clearColor,
         };
-        if (m_renderTarget->sampleCount() > 1)
+        if (m_textureRenderTarget)
+        {
+            // Texture targets don't have canvas-level MSAA. Use
+            // internal MSAA when PLS is not available.
+            if (!m_renderContext->platformFeatures().supportsRasterOrderingMode &&
+                !m_renderContext->platformFeatures().supportsAtomicMode)
+            {
+                frameDescriptor.msaaSampleCount = 4;
+            }
+        }
+        else if (m_renderTarget->sampleCount() > 1)
         {
             // Use MSAA if we were given a canvas with 'antialias: true'.
             frameDescriptor.msaaSampleCount = m_renderTarget->sampleCount();
@@ -431,6 +469,8 @@ public:
         WebGL2Factory::Instance()->bindActiveRenderer(this);
     }
 
+public:
+
     void saveClipRect(float l, float t, float r, float b)
     {
         save();
@@ -444,6 +484,31 @@ public:
     }
 
     void restoreClipRect() { restore(); }
+
+    void setSurfaceMaterial(uint32_t value,
+                            float l,
+                            float t,
+                            float r,
+                            float b,
+                            float timeSeconds)
+    {
+        gpu::SurfaceMaterial material;
+        switch (value)
+        {
+            case static_cast<uint32_t>(gpu::SurfaceMaterial::gold):
+                material = gpu::SurfaceMaterial::gold;
+                break;
+            case static_cast<uint32_t>(gpu::SurfaceMaterial::rainbow):
+                material = gpu::SurfaceMaterial::rainbow;
+                break;
+            default:
+                material = gpu::SurfaceMaterial::none;
+                break;
+        }
+        RiveRenderer::setSurfaceMaterial(material,
+                                         AABB(l, t, r, b),
+                                         timeSeconds);
+    }
 
     void drawImage(const RenderImage* renderImage,
                    const ImageSampler imageSampler,
@@ -553,12 +618,71 @@ public:
         }
 #endif
         ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
-        m_renderContext->flush({.renderTarget = m_renderTarget.get()});
+        m_renderContext->flush({.renderTarget = activeRenderTarget()});
         WebGL2Factory::Instance()->bindActiveRenderer(nullptr);
 #ifdef RIVE_CANVAS
         // The frame is over, so nothing is still compositing through these.
         m_compositeRenderers.clear();
 #endif
+    }
+
+    /**
+     * Set an external WebGL texture as the render target. When set,
+     * clear()/beginOverlayFrame()/flush() render to this texture
+     * instead of the default framebuffer (canvas).
+     */
+    void setTargetTexture(GLuint textureId, int width, int height)
+    {
+        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+        if (!m_textureRenderTarget ||
+            m_textureRenderTarget->width() != (uint32_t)width ||
+            m_textureRenderTarget->height() != (uint32_t)height)
+        {
+            m_textureRenderTarget = make_rcp<TextureRenderTargetGL>(width, height);
+        }
+        m_textureRenderTarget->setTargetTexture(textureId);
+    }
+
+    /**
+     * Remove the external texture target, reverting to default
+     * framebuffer (canvas) rendering.
+     */
+    void clearTargetTexture()
+    {
+        m_textureRenderTarget = nullptr;
+    }
+
+    /**
+     * Create a RenderImage from an existing GL texture. Uses the
+     * renderer's adoptImageTexture to create a proper TextureGLImpl
+     * that the PLS renderer can cast and bind correctly.
+     *
+     * WARNING: Takes ownership of the GL texture — it will be deleted
+     * when the returned RenderImage is freed. Caller must ensure the
+     * RenderImage outlives any external use of the texture.
+     */
+    RenderImageWrapper* makeImageFromGLTexture(GLuint textureId, int width, int height);
+
+    /**
+     * Re-binds Rive's internal textures and invalidates the GL state
+     * cache. Call this before Rive renders when another renderer (e.g.
+     * PixiJS) has been using the shared WebGL context.
+     */
+    void invalidateGLState()
+    {
+        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+        renderContextGL()->invalidateGLState();
+    }
+
+    /**
+     * Unbinds all Rive-internal VAOs, buffers, framebuffers, and
+     * textures. Call this after Rive renders, before yielding the
+     * shared WebGL context to another renderer (e.g. PixiJS).
+     */
+    void unbindGLInternalResources()
+    {
+        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+        renderContextGL()->unbindGLInternalResources();
     }
 
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)
@@ -706,7 +830,7 @@ public:
         const RenderContext::FrameDescriptor& outerFrame =
             m_canvasPasses.empty() ? m_screenFrame : m_canvasPasses.back().frame;
         gpu::RenderTarget* outerTarget = m_canvasPasses.empty()
-                                             ? static_cast<gpu::RenderTarget*>(m_renderTarget.get())
+                                             ? activeRenderTarget()
                                              : m_canvasPasses.back().target.get();
 
         // Frames cannot nest, so resolve what the interrupted target has drawn
@@ -776,6 +900,15 @@ private:
         return synchronizedBuffer.get();
     }
 
+    RenderTarget* activeRenderTarget() const
+    {
+        if (m_textureRenderTarget)
+        {
+            return m_textureRenderTarget.get();
+        }
+        return m_renderTarget.get();
+    }
+
     const EMSCRIPTEN_WEBGL_CONTEXT_HANDLE m_contextGL = emscripten_webgl_get_current_context();
 
     std::unique_ptr<RenderContext> m_renderContext;
@@ -799,6 +932,7 @@ private:
     std::vector<CanvasPass> m_canvasPasses;
     std::vector<std::unique_ptr<RiveRenderer>> m_compositeRenderers;
 #endif
+    rcp<TextureRenderTargetGL> m_textureRenderTarget;
 
     std::map<PLSResourceID, PLSSynchronizedBuffer> m_plsSynchronizedBuffers;
 
@@ -827,6 +961,20 @@ void WebGL2Factory::unregisterContext(WebGL2Renderer* renderer)
 #ifdef RIVE_CANVAS
 rive::cmd::DeferredCanvasHost* WebGL2Factory::canvasContentHost() { return m_activeRenderer; }
 #endif
+
+WebGL2RenderImage::WebGL2RenderImage(WebGL2Renderer* renderer,
+                                     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context,
+                                     GLuint textureId, int width, int height)
+{
+    m_Width = width;
+    m_Height = height;
+    m_contextGL = context;
+    m_renderImage = make_rcp<RiveRenderImage>(
+        renderer->renderContextGL()->adoptImageTexture(width, height, textureId));
+    // Signal the runtime that this image is decoded and ready to render.
+    // Without this, the artboard won't pick up the image.
+    decodedAsync();
+}
 
 RenderImage* WebGL2RenderImage::prep(WebGL2Renderer* webglRenderer,
                                      const EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context)
@@ -1013,7 +1161,7 @@ void WebGL2Renderer::deferredFlush()
     ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
     WebGL2FrameSink sink(this, m_host.doClear(), m_host.clearColor(), m_host.replayOre());
     m_host.replayInline(sink,
-                        [this] { m_renderContext->flush({.renderTarget = m_renderTarget.get()}); });
+                        [this] { m_renderContext->flush({.renderTarget = activeRenderTarget()}); });
 }
 
 #endif // RIVE_CANVAS && RIVE_ORE
@@ -1091,6 +1239,19 @@ public:
     void unref() { RenderImage::unref(); }
 };
 
+RenderImageWrapper* WebGL2Renderer::makeImageFromGLTexture(
+    GLuint textureId, int width, int height)
+{
+    ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+    // Create a WebGL2RenderImage with the GL texture already prepped.
+    // This is important: the PLS renderer expects WebGL2RenderImage
+    // (not raw RiveRenderImage) and calls prep() during flush.
+    auto image = make_rcp<WebGL2RenderImage>(
+        this, m_contextGL, textureId, width, height);
+    image->ref();
+    return (RenderImageWrapper*)(image.get());
+}
+
 // Optional trailing session: an image bound into a deferred file has to be
 // created through that file's session, the rest go to the immediate factory.
 RenderImageWrapper* decodeWebGL2Image(emscripten::val byteArray, emscripten::val session)
@@ -1110,6 +1271,11 @@ RenderImageWrapper* decodeWebGL2Image(emscripten::val byteArray, emscripten::val
 
 EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
 {
+    enum_<gpu::SurfaceMaterial>("SurfaceMaterial")
+        .value("none", gpu::SurfaceMaterial::none)
+        .value("gold", gpu::SurfaceMaterial::gold)
+        .value("rainbow", gpu::SurfaceMaterial::rainbow);
+
     class_<Renderer>("Renderer")
         .function("save", &Renderer::save)
         .function("restore", &Renderer::restore)
@@ -1136,7 +1302,16 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
         .function("detachSession", &WebGL2Renderer::detachSession)
         .function("deferredActive", &WebGL2Renderer::deferredActive)
 #endif
-        .function("restoreClipRect", &WebGL2Renderer::restoreClipRect);
+        .function("restoreClipRect", &WebGL2Renderer::restoreClipRect)
+        .function("setSurfaceMaterial", &WebGL2Renderer::setSurfaceMaterial)
+        .function("invalidateGLState", &WebGL2Renderer::invalidateGLState)
+        .function("unbindGLInternalResources", &WebGL2Renderer::unbindGLInternalResources)
+        .function("beginOverlayFrame", &WebGL2Renderer::beginOverlayFrame)
+        .function("_setTargetTexture", &WebGL2Renderer::setTargetTexture)
+        .function("_clearTargetTexture", &WebGL2Renderer::clearTargetTexture)
+        .function("_makeImageFromGLTexture",
+                  &WebGL2Renderer::makeImageFromGLTexture,
+                  allow_raw_pointers());
     class_<RenderImage>("RenderImage")
         .function("unref", &RenderImageWrapper::unref)
         .allow_subclass<RenderImageWrapper>("RenderImageWrapper");
