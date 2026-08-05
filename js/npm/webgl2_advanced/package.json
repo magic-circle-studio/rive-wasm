@@ -6,7 +6,7 @@
   "homepage": "https://rive.app",
   "repository": {
     "type": "git",
-    "url": "https://github.com/magic-circle-studio/rive-wasm.git",
+    "url": "git+https://github.com/magic-circle-studio/rive-wasm.git",
     "directory": "js"
   },
   "keywords": [
