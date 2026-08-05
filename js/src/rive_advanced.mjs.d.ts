@@ -36,6 +36,7 @@ export interface RiveCanvas {
   RenderPaintStyle: typeof RenderPaintStyle;
   StrokeCap: typeof StrokeCap;
   StrokeJoin: typeof StrokeJoin;
+  SurfaceMaterial: typeof SurfaceMaterial;
   decodeAudio: DecodeAudio;
   decodeImage: DecodeImage;
   decodeFont: DecodeFont;
@@ -173,13 +174,69 @@ export declare class RendererWrapper {
   clear(): void;
   delete(): void;
   flush(): void;
+  /**
+   * Re-binds Rive's internal textures and invalidates the GL state
+   * cache. Call before Rive renders when another renderer (e.g.
+   * PixiJS) has been using the shared WebGL context.
+   */
+  invalidateGLState(): void;
+  /**
+   * Unbinds all Rive-internal VAOs, buffers, framebuffers, and
+   * textures. Call after Rive renders, before yielding the shared
+   * WebGL context to another renderer (e.g. PixiJS).
+   */
+  unbindGLInternalResources(): void;
+  /**
+   * Begin a frame without clearing the framebuffer. Use instead of
+   * clear() when sharing a WebGL context with another renderer
+   * whose output should be preserved.
+   */
+  beginOverlayFrame(): void;
+  /**
+   * Set an external WebGL texture as the render target. When set,
+   * clear()/beginOverlayFrame()/flush() render to this texture
+   * instead of the default framebuffer (canvas).
+   *
+   * The texture must be on the same WebGL context. Rive does NOT
+   * own the texture — the caller manages its lifecycle.
+   */
+  setTargetTexture(texture: WebGLTexture, width: number, height: number): void;
+  /**
+   * Remove the external texture target, reverting to default
+   * framebuffer (canvas) rendering.
+   */
+  clearTargetTexture(): void;
+  /**
+   * Create a RenderImage from an external WebGLTexture for zero-copy
+   * texture sharing. The returned image can be set on a data binding
+   * image property via ViewModelInstanceAssetImage.value().
+   *
+   * Rive takes ownership of the GL texture via adoptImageTexture —
+   * it will be deleted when the RenderImage is freed. The caller
+   * must ensure the RenderImage outlives any external use of the
+   * texture, or use a dedicated texture for Rive.
+   */
+  makeImageFromGLTexture(
+    texture: WebGLTexture,
+    width: number,
+    height: number
+  ): ImageInternal;
+  /** Selects a deformation-aware material for subsequent vector path draws. */
+  setSurfaceMaterial(
+    material: SurfaceMaterial,
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+    timeSeconds: number
+  ): void;
   translate(x: number, y: number): void;
   rotate(angle: number): void;
   /**
    * (WebGL only) Makes the GL context that backs this renderer's textures current, before
    * performing any WASM teardown that frees resources
    */
-  bindContext?(): void;
+  bindContext(): void;
 }
 
 export declare class RenderPathWrapper {
@@ -1226,6 +1283,13 @@ export enum DataType {
   listIndex = 'listIndex',
   image = 'image',
   artboard = 'artboard',
+}
+
+/** Renderer-native material applied to vector path paints. */
+export enum SurfaceMaterial {
+  none,
+  gold,
+  rainbow,
 }
 
 export enum Fit {

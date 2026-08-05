@@ -109,14 +109,24 @@ Module["onRuntimeInitialized"] = function () {
     renderer._gl = gl;
     // Re-bind our context before any teardown that routes into glDelete*, which
     // deref the *current* GLctx.
-    renderer.bindContext = function () {
+    renderer["bindContext"] = function () {
       if (this._handle) {
         GL.makeContextCurrent(this._handle);
       }
     };
-    var nativeDelete = renderer.delete;
-    renderer.delete = function () {
-      this.bindContext();
+    var nativeDelete = renderer["delete"];
+    renderer["delete"] = function () {
+      this["bindContext"]();
+      if (this._externalTextureGLId) {
+        GL.textures[this._externalTextureGLId] = null;
+        this._externalTextureGLId = null;
+      }
+      if (this._externalImageTextureGLIds) {
+        for (var i = 0; i < this._externalImageTextureGLIds.length; i++) {
+          GL.textures[this._externalImageTextureGLIds[i]] = null;
+        }
+        this._externalImageTextureGLIds = null;
+      }
       nativeDelete.call(this);
       GL.deleteContext(this._handle);
       this._handle = this._canvas = this._width = this._height = this._gl = null;
@@ -406,16 +416,84 @@ Module["onRuntimeInitialized"] = function () {
 
   const cppClear = Module["WebGL2Renderer"]["prototype"]["clear"];
   Module["WebGL2Renderer"]["prototype"]["clear"] = function () {
-    // Resize WebGL surface if the canvas size changed.
     GL.makeContextCurrent(this._handle);
-    const canvas = this._canvas;
-    if (this._width != canvas.width || this._height != canvas.height) {
-      this.resize(canvas.width, canvas.height);
-      this._width = canvas.width;
-      this._height = canvas.height;
+    // Only auto-resize from canvas when targeting the default framebuffer.
+    if (!this._externalTextureGLId) {
+      const canvas = this._canvas;
+      if (this._width != canvas.width || this._height != canvas.height) {
+        this.resize(canvas.width, canvas.height);
+        this._width = canvas.width;
+        this._height = canvas.height;
+      }
     }
     cppClear.call(this);
   };
+
+  const cppBeginOverlayFrame = Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"];
+  Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"] = function () {
+    GL.makeContextCurrent(this._handle);
+    // Only auto-resize from canvas when targeting the default framebuffer.
+    if (!this._externalTextureGLId) {
+      const canvas = this._canvas;
+      if (this._width != canvas.width || this._height != canvas.height) {
+        this.resize(canvas.width, canvas.height);
+        this._width = canvas.width;
+        this._height = canvas.height;
+      }
+    }
+    cppBeginOverlayFrame.call(this);
+  };
+
+  const cppSetTargetTexture = Module["WebGL2Renderer"]["prototype"]["_setTargetTexture"];
+  const cppClearTargetTexture = Module["WebGL2Renderer"]["prototype"]["_clearTargetTexture"];
+
+  Module["WebGL2Renderer"]["prototype"]["setTargetTexture"] = function (webglTexture, width, height) {
+    GL.makeContextCurrent(this._handle);
+    // Unregister previous external texture if any.
+    if (this._externalTextureGLId) {
+      GL.textures[this._externalTextureGLId] = null;
+      this._externalTextureGLId = null;
+    }
+    // Register the WebGLTexture in Emscripten's GL.textures table
+    // so C++ can reference it as a GLuint.
+    var id = GL.getNewId(GL.textures);
+    GL.textures[id] = webglTexture;
+    this._externalTextureGLId = id;
+    cppSetTargetTexture.call(this, id, width, height);
+  };
+
+  Module["WebGL2Renderer"]["prototype"]["clearTargetTexture"] = function () {
+    GL.makeContextCurrent(this._handle);
+    cppClearTargetTexture.call(this);
+    if (this._externalTextureGLId) {
+      GL.textures[this._externalTextureGLId] = null;
+      this._externalTextureGLId = null;
+    }
+  };
+
+  const cppMakeImageFromGLTexture =
+    Module["WebGL2Renderer"]["prototype"]["_makeImageFromGLTexture"];
+
+  /**
+   * Create a RenderImage from an external WebGLTexture for zero-copy
+   * texture sharing. The returned image can be set on a data binding
+   * image property via ViewModelInstanceAssetImage.value().
+   *
+   * Rive takes ownership of the GL texture via adoptImageTexture —
+   * it will be deleted when the RenderImage is freed. Use a dedicated
+   * texture for Rive, not one shared with another renderer.
+   */
+  Module["WebGL2Renderer"]["prototype"]["makeImageFromGLTexture"] =
+    function (webglTexture, width, height) {
+      GL.makeContextCurrent(this._handle);
+      var id = GL.getNewId(GL.textures);
+      GL.textures[id] = webglTexture;
+      if (!this._externalImageTextureGLIds) {
+        this._externalImageTextureGLIds = [];
+      }
+      this._externalImageTextureGLIds.push(id);
+      return cppMakeImageFromGLTexture.call(this, id, width, height);
+    };
 
   Module["decodeImage"] = function (bytes, onComplete) {
     let image = Module["decodeWebGL2Image"](bytes);

@@ -1,12 +1,13 @@
 {
-  "name": "@rive-app/webgl2-advanced",
-  "version": "2.39.2",
-  "description": "Rive's webgl2 low-level canvas based web api.",
+  "name": "@magiccircle/rive-webgl2-advanced",
+  "version": "2.39.2-mc.1",
+  "description": "Magic Circle's Rive WebGL2 advanced runtime fork.",
   "main": "webgl2_advanced.mjs",
   "homepage": "https://rive.app",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rive-app/rive-wasm/tree/master/js"
+    "url": "https://github.com/magic-circle-studio/rive-wasm.git",
+    "directory": "js"
   },
   "keywords": [
     "rive",
@@ -25,7 +26,9 @@
   "files": [
     "webgl2_advanced.mjs",
     "rive.wasm",
-    "rive_advanced.mjs.d.ts"
+    "rive_advanced.mjs.d.ts",
+    "surface_material_shader.mjs",
+    "surface_material_shader.mjs.d.ts"
   ],
   "types": "rive_advanced.mjs.d.ts",
   "dependencies": {},
