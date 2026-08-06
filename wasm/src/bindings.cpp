@@ -1320,6 +1320,12 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
     class_<rive::SMITrigger, base<rive::SMIInput>>("SMITrigger")
         .function("fire", &rive::SMITrigger::fire);
 
+    enum_<rive::SurfaceMaterial>("SurfaceMaterial")
+        .value("None", rive::SurfaceMaterial::none)
+        .value("Inherit", rive::SurfaceMaterial::inherit)
+        .value("Rainbow", rive::SurfaceMaterial::rainbow)
+        .value("Gold", rive::SurfaceMaterial::gold);
+
     enum_<rive::Fit>("Fit")
         .value("fill", rive::Fit::fill)
         .value("contain", rive::Fit::contain)
@@ -1647,7 +1653,9 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
             "value",
             optional_override([](rive::ViewModelInstanceAssetImageRuntime& self,
                                  rive::RenderImage* renderImage) { self.value(renderImage); }),
-            allow_raw_pointers());
+            allow_raw_pointers())
+        .function("setSurfaceMaterial",
+                  &rive::ViewModelInstanceAssetImageRuntime::setSurfaceMaterial);
     class_<rive::ViewModelInstanceAssetFontRuntime, base<rive::ViewModelInstanceValueRuntime>>(
         "ViewModelInstanceAssetFont")
         .function(

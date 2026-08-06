@@ -221,7 +221,7 @@ export declare class RendererWrapper {
     width: number,
     height: number
   ): ImageInternal;
-  /** Selects a deformation-aware material for subsequent vector path draws. */
+  /** Selects the default material for supported subsequent artboard draws. */
   setSurfaceMaterial(
     material: SurfaceMaterial,
     left: number,
@@ -1211,6 +1211,11 @@ export declare class ViewModelInstanceList extends ViewModelInstanceValue {
 }
 export declare class ViewModelInstanceAssetImage extends ViewModelInstanceValue {
   value(image: ImageInternal | null): void;
+  /**
+   * Selects the material for this image binding. Image meshes and renderer
+   * fallback draws remain unmaterialized.
+   */
+  setSurfaceMaterial(material: SurfaceMaterial): void;
 }
 export declare class ViewModelInstanceAssetFont extends ViewModelInstanceValue {
   value(font: FontInternal | null): void;
@@ -1285,11 +1290,14 @@ export enum DataType {
   artboard = 'artboard',
 }
 
-/** Renderer-native material applied to vector path paints. */
+/** Renderer-native material selected by an artboard or image binding. */
 export enum SurfaceMaterial {
-  none,
-  gold,
-  rainbow,
+  /** Draw without a surface material. */
+  None = 0,
+  /** Use the enclosing artboard's material. */
+  Inherit = 3,
+  Rainbow = 2,
+  Gold = 1,
 }
 
 export enum Fit {

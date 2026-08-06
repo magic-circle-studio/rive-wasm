@@ -13,6 +13,10 @@ const packageDirectory =
 const fixturePath =
   process.env.RIVE_TEST_FIXTURE ??
   join(repositoryRoot, "js/test/assets/fallback_fonts_test.riv");
+const imageBindingFixturePath = join(
+  repositoryRoot,
+  "wasm/submodules/rive-runtime/tests/unit_tests/assets/data_binding_images_test.riv",
+);
 const resultMarker = "RIVE_PACKAGE_TEST_RESULT";
 const legacyComparison = process.env.RIVE_TEST_LEGACY === "1";
 
@@ -210,8 +214,31 @@ const testPage = String.raw`<!doctype html>
           assert(typeof renderer[name] === "function", "Missing renderer API: " + name);
         }
         const enumValue = (value) => value?.value ?? value;
-        assert(enumValue(rive.SurfaceMaterial.gold) === 1, "Gold enum value changed.");
-        assert(enumValue(rive.SurfaceMaterial.rainbow) === 2, "Rainbow enum value changed.");
+        assert(enumValue(rive.SurfaceMaterial.None) === 0, "None enum value changed.");
+        assert(enumValue(rive.SurfaceMaterial.Inherit) === 3, "Inherit enum value changed.");
+        assert(enumValue(rive.SurfaceMaterial.Rainbow) === 2, "Rainbow enum value changed.");
+        assert(enumValue(rive.SurfaceMaterial.Gold) === 1, "Gold enum value changed.");
+
+        const imageBindingFixtureBytes = new Uint8Array(
+          await (await fetch("/image-binding-fixture.riv")).arrayBuffer(),
+        );
+        const imageBindingFile = await rive.load(imageBindingFixtureBytes);
+        const imageBindingArtboard = imageBindingFile.artboardByName("main");
+        const imageBindingViewModel =
+          imageBindingFile.defaultArtboardViewModel(imageBindingArtboard);
+        const imageBindingInstance = imageBindingViewModel.defaultInstance();
+        const imageBinding = imageBindingInstance.image("main_im");
+        assert(imageBinding, "The image binding fixture has no main_im property.");
+        assert(
+          typeof imageBinding.setSurfaceMaterial === "function",
+          "Image bindings do not expose setSurfaceMaterial().",
+        );
+        imageBinding.setSurfaceMaterial(rive.SurfaceMaterial.None);
+        imageBinding.setSurfaceMaterial(rive.SurfaceMaterial.Rainbow);
+        imageBinding.setSurfaceMaterial(rive.SurfaceMaterial.Inherit);
+        imageBindingInstance.delete();
+        imageBindingArtboard.delete();
+        imageBindingFile.unref();
 
         const gl = canvas.getContext("webgl2");
         assert(gl, "WebGL2 is unavailable in the test browser.");
@@ -429,6 +456,10 @@ async function main() {
       throw new Error(`Installing the packed artifact failed:\n${installResult.stderr}`);
     }
     await copyFile(fixturePath, join(temporaryDirectory, "fixture.riv"));
+    await copyFile(
+      imageBindingFixturePath,
+      join(temporaryDirectory, "image-binding-fixture.riv"),
+    );
     await writeFile(join(temporaryDirectory, "index.html"), testPage);
 
     const server = await startServer(temporaryDirectory);
