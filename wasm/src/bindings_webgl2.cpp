@@ -492,20 +492,7 @@ public:
                             float b,
                             float timeSeconds)
     {
-        gpu::SurfaceMaterial material;
-        switch (value)
-        {
-            case static_cast<uint32_t>(gpu::SurfaceMaterial::gold):
-                material = gpu::SurfaceMaterial::gold;
-                break;
-            case static_cast<uint32_t>(gpu::SurfaceMaterial::rainbow):
-                material = gpu::SurfaceMaterial::rainbow;
-                break;
-            default:
-                material = gpu::SurfaceMaterial::none;
-                break;
-        }
-        RiveRenderer::setSurfaceMaterial(material,
+        RiveRenderer::setSurfaceMaterial(surfaceMaterialFromValue(value),
                                          AABB(l, t, r, b),
                                          timeSeconds);
     }
@@ -1271,11 +1258,6 @@ RenderImageWrapper* decodeWebGL2Image(emscripten::val byteArray, emscripten::val
 
 EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
 {
-    enum_<gpu::SurfaceMaterial>("SurfaceMaterial")
-        .value("none", gpu::SurfaceMaterial::none)
-        .value("gold", gpu::SurfaceMaterial::gold)
-        .value("rainbow", gpu::SurfaceMaterial::rainbow);
-
     class_<Renderer>("Renderer")
         .function("save", &Renderer::save)
         .function("restore", &Renderer::restore)
