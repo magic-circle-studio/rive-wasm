@@ -515,20 +515,7 @@ public:
                             float b,
                             float timeSeconds)
     {
-        gpu::SurfaceMaterial material;
-        switch (value)
-        {
-            case static_cast<uint32_t>(gpu::SurfaceMaterial::gold):
-                material = gpu::SurfaceMaterial::gold;
-                break;
-            case static_cast<uint32_t>(gpu::SurfaceMaterial::rainbow):
-                material = gpu::SurfaceMaterial::rainbow;
-                break;
-            default:
-                material = gpu::SurfaceMaterial::none;
-                break;
-        }
-        RiveRenderer::setSurfaceMaterial(material,
+        RiveRenderer::setSurfaceMaterial(surfaceMaterialFromValue(value),
                                          AABB(l, t, r, b),
                                          timeSeconds);
     }
@@ -1638,11 +1625,6 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
     defined(RIVE_WEBGL2_RENDERER_CANVAS_BINDINGS)
 #error RIVE_WEBGL2_RENDERER cannot have both _STANDALONE_BINDINGS and _CANVAS_BINDINGS enabled
 #elif defined(RIVE_WEBGL2_RENDERER_STANDALONE_BINDINGS)
-    enum_<gpu::SurfaceMaterial>("SurfaceMaterial")
-        .value("none", gpu::SurfaceMaterial::none)
-        .value("gold", gpu::SurfaceMaterial::gold)
-        .value("rainbow", gpu::SurfaceMaterial::rainbow);
-
     class_<Renderer>("Renderer")
         .function("save", &Renderer::save)
         .function("restore", &Renderer::restore)
