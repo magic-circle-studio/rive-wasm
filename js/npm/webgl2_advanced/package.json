@@ -26,6 +26,7 @@
   "files": [
     "webgl2_advanced.mjs",
     "rive.wasm",
+    "rive_fallback.wasm",
     "rive_advanced.mjs.d.ts",
     "surface_material_shader.mjs",
     "surface_material_shader.mjs.d.ts"
