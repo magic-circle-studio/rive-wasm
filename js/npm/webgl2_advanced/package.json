@@ -1,6 +1,6 @@
 {
   "name": "@magiccircle/rive-webgl2-advanced",
-  "version": "2.39.2-mc.1",
+  "version": "2.39.2-mc.2",
   "description": "Magic Circle's Rive WebGL2 advanced runtime fork.",
   "main": "webgl2_advanced.mjs",
   "homepage": "https://rive.app",

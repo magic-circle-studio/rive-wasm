@@ -10,7 +10,7 @@ The fork adds:
 - explicit WebGL context handoff APIs for sharing a canvas with PixiJS;
 - rendering into a caller-owned immutable WebGL texture;
 - wrapping a WebGL texture as a Rive image;
-- deformation-aware Gold and Rainbow vector materials; and
+- deformation-aware animated Gold and static Rainbow vector materials; and
 - a generated JavaScript export of the same material shader source.
 
 ## Build
