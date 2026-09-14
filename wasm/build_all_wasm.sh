@@ -6,7 +6,7 @@ set -e
 # -i          Incremental build. Skips cleaning the build directory so only
 #             changed C++ files are recompiled.
 # -r <targets> For local dev. Comma-separated list of targets to build.
-#             Skips all fallback WASM builds and only compiles the specified targets.
+#             WebGL2 includes both WASM variants; other targets skip fallbacks.
 #             Available: canvas, canvas-lite, canvas-single, canvas-lite-single,
 #               webgl2, webgl2-single
 WASM_CONFIG=release
@@ -123,13 +123,15 @@ if target_enabled "canvas-lite-single"; then
     # build for testing purposes, and let webpack reference the wasm/build for this package here
 fi
 
-if [ -z "$TARGETS" ]; then
+if target_enabled "webgl2"; then
     echo
     echo "::::: building @rive-app/webgl2_advanced fallback"
     echo
-    OUT_DIR=build/webgl2_advanced/bin/${WASM_CONFIG} ./build_wasm.sh -c -r webgl2 ${WASM_CONFIG}
-    cp build/webgl2_advanced/bin/${WASM_CONFIG}/webgl2_advanced.wasm ../js/npm/webgl2_advanced/rive_fallback.wasm
-    cp build/webgl2_advanced/bin/${WASM_CONFIG}/webgl2_advanced.wasm ../js/npm/webgl2/rive_fallback.wasm
+    # Separate object directories: make does not rebuild objects when only
+    # compiler flags change, so sharing the SIMD directory can mix variants.
+    OUT_DIR=build/webgl2_advanced_fallback/bin/${WASM_CONFIG} ./build_wasm.sh -c -r webgl2 ${WASM_CONFIG}
+    cp build/webgl2_advanced_fallback/bin/${WASM_CONFIG}/webgl2_advanced.wasm ../js/npm/webgl2_advanced/rive_fallback.wasm
+    cp build/webgl2_advanced_fallback/bin/${WASM_CONFIG}/webgl2_advanced.wasm ../js/npm/webgl2/rive_fallback.wasm
 fi
 
 if target_enabled "webgl2"; then

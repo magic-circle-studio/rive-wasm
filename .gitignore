@@ -42,6 +42,7 @@ node_modules
 /js/dist/rive.d.ts
 /js/dist
 /build
+/dist/
 .cache
 /js/npm/canvas_advanced_single/canvas_advanced_single.mjs
 /js/npm/canvas_advanced_lite_single/canvas_advanced_single.mjs

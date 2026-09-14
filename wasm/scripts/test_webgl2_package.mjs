@@ -1,5 +1,12 @@
 import { spawn, spawnSync } from "node:child_process";
-import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, resolve } from "node:path";
@@ -17,7 +24,6 @@ const imageBindingFixturePath = join(
   repositoryRoot,
   "wasm/submodules/rive-runtime/tests/unit_tests/assets/data_binding_images_test.riv",
 );
-const resultMarker = "RIVE_PACKAGE_TEST_RESULT";
 const legacyComparison = process.env.RIVE_TEST_LEGACY === "1";
 
 const mimeTypes = new Map([
@@ -71,10 +77,22 @@ function run(command, args, options = {}) {
 
 /** Serves the temporary packed-package fixture over HTTP. */
 async function startServer(rootDirectory) {
+  let receiveResult;
+  const result = new Promise((resolvePromise) => {
+    receiveResult = resolvePromise;
+  });
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", "http://localhost");
-      const relativePath = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
+      if (url.pathname === "/__test_result" && request.method === "POST") {
+        const chunks = [];
+        for await (const chunk of request) chunks.push(chunk);
+        receiveResult(JSON.parse(Buffer.concat(chunks).toString()));
+        response.writeHead(200).end();
+        return;
+      }
+      const relativePath =
+        url.pathname === "/" ? "index.html" : url.pathname.slice(1);
       const path = resolve(rootDirectory, relativePath);
       if (path !== rootDirectory && !path.startsWith(`${rootDirectory}/`)) {
         response.writeHead(403).end();
@@ -82,19 +100,23 @@ async function startServer(rootDirectory) {
       }
       const contents = await readFile(path);
       response.writeHead(200, {
-        "Content-Type": mimeTypes.get(extname(path)) ?? "application/octet-stream",
+        "Content-Type":
+          mimeTypes.get(extname(path)) ?? "application/octet-stream",
       });
       response.end(contents);
     } catch {
       response.writeHead(404).end();
     }
   });
-  await new Promise((resolvePromise) => server.listen(0, "127.0.0.1", resolvePromise));
+  await new Promise((resolvePromise) =>
+    server.listen(0, "127.0.0.1", resolvePromise),
+  );
   const address = server.address();
   if (!address || typeof address === "string") {
     throw new Error("The package test HTTP server did not bind a TCP port.");
   }
   return {
+    result,
     close: () => new Promise((resolvePromise) => server.close(resolvePromise)),
     url: `http://127.0.0.1:${address.port}`,
   };
@@ -127,7 +149,11 @@ const testPage = String.raw`<!doctype html>
       if (!${JSON.stringify(legacyComparison)}) apiNames.push("bindContext");
 
       function finish(payload) {
-        result.textContent = ${JSON.stringify(resultMarker)} + JSON.stringify(payload);
+        result.textContent = JSON.stringify(payload);
+        void fetch("/__test_result", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
       }
 
       function assert(condition, message) {
@@ -202,9 +228,19 @@ const testPage = String.raw`<!doctype html>
 
       async function main() {
         const packageRoot = "/node_modules/@magiccircle/rive-webgl2-advanced/";
+        const variant = new URLSearchParams(location.search).get("variant");
+        const fallback = variant === "fallback";
+        const simdBytes = await (await fetch(packageRoot + "rive.wasm")).arrayBuffer();
+        const fallbackBytes = await (await fetch(packageRoot + "rive_fallback.wasm")).arrayBuffer();
+        assert(WebAssembly.validate(fallbackBytes), "Compatibility WASM failed validation.");
+        assert(
+          WebAssembly.validate(simdBytes) === !fallback,
+          "Expected the SIMD build to validate only in the SIMD-enabled browser. " +
+            "The restricted browser test requires x86-64 Chrome.",
+        );
         const { default: createRive } = await import(packageRoot + "webgl2_advanced.mjs");
         const rive = await createRive({
-          locateFile: () => packageRoot + "rive.wasm",
+          wasmBinary: fallback ? fallbackBytes : simdBytes,
         });
         const canvas = document.querySelector("#canvas");
         const renderer = rive.makeRenderer(canvas);
@@ -393,6 +429,7 @@ const testPage = String.raw`<!doctype html>
         rive.cleanup?.();
         finish({
           ok: true,
+          variant,
           defaultOpaquePixels,
           opaquePixels,
           materialDifferences,
@@ -423,18 +460,31 @@ const testPage = String.raw`<!doctype html>
 
 async function main() {
   const browser = findBrowser();
-  const temporaryDirectory = await mkdtemp(join(tmpdir(), "rive-webgl2-package-"));
+  const temporaryDirectory = await mkdtemp(
+    join(tmpdir(), "rive-webgl2-package-"),
+  );
   try {
-    const packResult = await run(
-      "npm",
-      ["pack", packageDirectory, "--json", "--pack-destination", temporaryDirectory],
-      { cwd: repositoryRoot },
-    );
-    if (packResult.status !== 0) {
-      throw new Error(`npm pack failed:\n${packResult.stderr}`);
+    let tarballPath = process.env.RIVE_TEST_PACKAGE_TARBALL;
+    if (tarballPath) {
+      tarballPath = resolve(tarballPath);
+    } else {
+      const packResult = await run(
+        "npm",
+        [
+          "pack",
+          packageDirectory,
+          "--json",
+          "--pack-destination",
+          temporaryDirectory,
+        ],
+        { cwd: repositoryRoot },
+      );
+      if (packResult.status !== 0) {
+        throw new Error(`npm pack failed:\n${packResult.stderr}`);
+      }
+      const packMetadata = JSON.parse(packResult.stdout);
+      tarballPath = join(temporaryDirectory, packMetadata[0].filename);
     }
-    const packMetadata = JSON.parse(packResult.stdout);
-    const tarballPath = join(temporaryDirectory, packMetadata[0].filename);
     await stat(tarballPath);
     await writeFile(
       join(temporaryDirectory, "package.json"),
@@ -453,7 +503,9 @@ async function main() {
       { cwd: temporaryDirectory },
     );
     if (installResult.status !== 0) {
-      throw new Error(`Installing the packed artifact failed:\n${installResult.stderr}`);
+      throw new Error(
+        `Installing the packed artifact failed:\n${installResult.stderr}`,
+      );
     }
     await copyFile(fixturePath, join(temporaryDirectory, "fixture.riv"));
     await copyFile(
@@ -462,38 +514,70 @@ async function main() {
     );
     await writeFile(join(temporaryDirectory, "index.html"), testPage);
 
-    const server = await startServer(temporaryDirectory);
-    try {
-      const browserResult = await run(browser, [
-        "--headless=new",
-        "--no-sandbox",
-        "--disable-dev-shm-usage",
-        "--enable-webgl",
-        "--enable-unsafe-swiftshader",
-        "--ignore-gpu-blocklist",
-        "--use-angle=swiftshader",
-        "--virtual-time-budget=30000",
-        "--dump-dom",
-        server.url,
-      ]);
-      const markerIndex = browserResult.stdout.indexOf(resultMarker);
-      if (browserResult.status !== 0 || markerIndex < 0) {
-        throw new Error(
-          `Chrome did not complete the package test.\n${browserResult.stderr}\n${browserResult.stdout}`,
-        );
+    for (const variant of ["simd", "fallback"]) {
+      const server = await startServer(temporaryDirectory);
+      const browserProcess = spawn(
+        browser,
+        [
+          "--headless=new",
+          "--no-sandbox",
+          "--disable-dev-shm-usage",
+          "--enable-webgl",
+          "--enable-unsafe-swiftshader",
+          "--ignore-gpu-blocklist",
+          "--use-angle=swiftshader",
+          "--no-first-run",
+          "--user-data-dir=" + join(temporaryDirectory, "browser-" + variant),
+          ...(variant === "fallback" ? ["--js-flags=--no-enable-sse4-1"] : []),
+          `${server.url}/?variant=${variant}`,
+        ],
+        { stdio: ["ignore", "ignore", "pipe"] },
+      );
+      let browserErrors = "";
+      browserProcess.stderr.setEncoding("utf8");
+      browserProcess.stderr.on("data", (chunk) => {
+        browserErrors += chunk;
+      });
+      const browserClosed = new Promise((resolvePromise) =>
+        browserProcess.once("close", resolvePromise),
+      );
+      let timeoutId;
+      try {
+        // WASM compilation runs outside Chrome's virtual clock. Wait for the
+        // page to finish instead of dumping a possibly still-loading DOM.
+        const result = await Promise.race([
+          server.result,
+          browserClosed.then(() => {
+            throw new Error("Chrome exited before completing the test.");
+          }),
+          new Promise((_, rejectPromise) => {
+            browserProcess.once("error", rejectPromise);
+            timeoutId = setTimeout(
+              () =>
+                rejectPromise(
+                  new Error(
+                    "Chrome did not complete the test within 30 seconds.",
+                  ),
+                ),
+              30_000,
+            );
+          }),
+        ]);
+        if (!result.ok) {
+          throw new Error(
+            `Packed browser test failed: ${result.error}\n` +
+              `${result.browserMessages?.join("\n") ?? ""}`,
+          );
+        }
+        console.log("Packed WebGL2 browser test passed.", result);
+      } catch (error) {
+        throw new Error(`${error.message}\n${browserErrors}`, { cause: error });
+      } finally {
+        clearTimeout(timeoutId);
+        browserProcess.kill();
+        await browserClosed;
+        await server.close();
       }
-      const resultStart = markerIndex + resultMarker.length;
-      const resultEnd = browserResult.stdout.indexOf("</pre>", resultStart);
-      const result = JSON.parse(browserResult.stdout.slice(resultStart, resultEnd));
-      if (!result.ok) {
-        throw new Error(
-          `Packed browser test failed: ${result.error}\n` +
-            `${result.browserMessages?.join("\n") ?? ""}\n${browserResult.stderr}`,
-        );
-      }
-      console.log("Packed WebGL2 browser test passed.", result);
-    } finally {
-      await server.close();
     }
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
