@@ -1,8 +1,18 @@
-import type {
-  ImageWrapper,
-  AudioWrapper,
-  FontWrapper,
-} from "./utils/finalizationRegistry";
+// Structural high-level asset wrappers accepted by the low-level setters.
+// Keep these declarations self-contained: advanced packages do not ship the
+// high-level finalizationRegistry module.
+interface ImageWrapper extends FinalizableTarget {
+  readonly nativeImage: ImageInternal;
+  unref(): void;
+}
+interface AudioWrapper extends FinalizableTarget {
+  readonly nativeAudio: AudioInternal;
+  unref(): void;
+}
+interface FontWrapper extends FinalizableTarget {
+  readonly nativeFont: FontInternal;
+  unref(): void;
+}
 
 interface RiveOptions {
   locateFile(file: string): string;

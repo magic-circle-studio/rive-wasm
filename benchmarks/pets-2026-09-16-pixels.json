@@ -1,0 +1,58 @@
+{
+  "normal": {
+    "changedPixels": 227,
+    "changedChannels": 276,
+    "channelsAboveOne": 0,
+    "maxChannelDifference": 1,
+    "meanAbsoluteChannelDifference": 0.0010528564453125,
+    "changedAlphaPixels": 0
+  },
+  "gold": {
+    "changedPixels": 59,
+    "changedChannels": 69,
+    "channelsAboveOne": 0,
+    "maxChannelDifference": 1,
+    "meanAbsoluteChannelDifference": 0.000263214111328125,
+    "changedAlphaPixels": 0
+  },
+  "goldStaticA": {
+    "changedPixels": 62,
+    "changedChannels": 72,
+    "channelsAboveOne": 0,
+    "maxChannelDifference": 1,
+    "meanAbsoluteChannelDifference": 0.000274658203125,
+    "changedAlphaPixels": 0
+  },
+  "goldStaticB": {
+    "changedPixels": 62,
+    "changedChannels": 72,
+    "channelsAboveOne": 0,
+    "maxChannelDifference": 1,
+    "meanAbsoluteChannelDifference": 0.000274658203125,
+    "changedAlphaPixels": 0
+  },
+  "rainbow": {
+    "changedPixels": 113,
+    "changedChannels": 121,
+    "channelsAboveOne": 0,
+    "maxChannelDifference": 1,
+    "meanAbsoluteChannelDifference": 0.000461578369140625,
+    "changedAlphaPixels": 0
+  },
+  "rainbowStaticA": {
+    "changedPixels": 113,
+    "changedChannels": 121,
+    "channelsAboveOne": 0,
+    "maxChannelDifference": 1,
+    "meanAbsoluteChannelDifference": 0.000461578369140625,
+    "changedAlphaPixels": 0
+  },
+  "rainbowStaticB": {
+    "changedPixels": 113,
+    "changedChannels": 121,
+    "channelsAboveOne": 0,
+    "maxChannelDifference": 1,
+    "meanAbsoluteChannelDifference": 0.000461578369140625,
+    "changedAlphaPixels": 0
+  }
+}

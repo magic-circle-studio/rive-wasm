@@ -140,7 +140,9 @@ Module["onRuntimeInitialized"] = function () {
   Module.makeRenderer = function (canvas, useOffScreenRenderer) {
     if (!_offscreenGL) {
       function MakeOffscreenGL(enableMSAA) {
-        const offscreenCanvas = document.createElement("canvas");
+        const offscreenCanvas = typeof document === "undefined"
+          ? new OffscreenCanvas(1, 1)
+          : document.createElement("canvas");
         offscreenCanvas.width = 1;
         offscreenCanvas.height = 1;
         _offscreenGL = makeGLRenderer(offscreenCanvas, enableMSAA);

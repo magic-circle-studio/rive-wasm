@@ -105,7 +105,10 @@ do
     filter('options:config=release')
     do
         -- Link-time -Os gates emcc's wasm-opt pass; without it the wasm ships unoptimized.
-        linkoptions({ '-Os', '-s ASSERTIONS=0', '--closure 1' })
+        -- One JS loader serves both SIMD and scalar WASM. Emscripten's -Os
+        -- import/export minification assigns different names in each build.
+        -- Its exports library disables that renaming while retaining wasm-opt.
+        linkoptions({ '-Os', '-lexports.js', '-s ASSERTIONS=0', '--closure 1' })
     end
 
     filter({})
