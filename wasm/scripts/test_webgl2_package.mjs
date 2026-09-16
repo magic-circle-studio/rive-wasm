@@ -19,6 +19,7 @@ const imageBindingFixturePath = join(
 );
 const resultMarker = "RIVE_PACKAGE_TEST_RESULT";
 const legacyComparison = process.env.RIVE_TEST_LEGACY === "1";
+const artboardName = process.env.RIVE_TEST_ARTBOARD ?? null;
 
 const mimeTypes = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -100,7 +101,8 @@ async function startServer(rootDirectory) {
   };
 }
 
-const testPage = String.raw`<!doctype html>
+/** Exercises one binary through the package's shared JavaScript loader. */
+const testPage = (wasmFilename) => String.raw`<!doctype html>
 <html>
   <body>
     <pre id="result">pending</pre>
@@ -204,7 +206,7 @@ const testPage = String.raw`<!doctype html>
         const packageRoot = "/node_modules/@magiccircle/rive-webgl2-advanced/";
         const { default: createRive } = await import(packageRoot + "webgl2_advanced.mjs");
         const rive = await createRive({
-          locateFile: () => packageRoot + "rive.wasm",
+          locateFile: () => packageRoot + ${JSON.stringify(wasmFilename)},
         });
         const canvas = document.querySelector("#canvas");
         const renderer = rive.makeRenderer(canvas);
@@ -244,7 +246,9 @@ const testPage = String.raw`<!doctype html>
         assert(gl, "WebGL2 is unavailable in the test browser.");
         const fixtureBytes = new Uint8Array(await (await fetch("/fixture.riv")).arrayBuffer());
         const file = await rive.load(fixtureBytes);
-        const artboard = file.defaultArtboard();
+        const artboard = ${JSON.stringify(artboardName)}
+          ? file.artboardByName(${JSON.stringify(artboardName)})
+          : file.defaultArtboard();
         artboard.advance(0);
 
         bindRendererContext();
@@ -387,6 +391,14 @@ const testPage = String.raw`<!doctype html>
         assert(image, "makeImageFromGLTexture() returned no image.");
         image.unref();
 
+        const pixelHashes = {};
+        for (const [name, pixels] of Object.entries(materialPixels)) {
+          const digest = await crypto.subtle.digest("SHA-256", pixels);
+          pixelHashes[name] = Array.from(new Uint8Array(digest), (byte) =>
+            byte.toString(16).padStart(2, "0"),
+          ).join("");
+        }
+
         artboard.delete();
         file.unref();
         renderer.delete();
@@ -397,6 +409,7 @@ const testPage = String.raw`<!doctype html>
           opaquePixels,
           materialDifferences,
           staticMaterialDifferences,
+          pixelHashes,
         });
       }
 
@@ -421,7 +434,8 @@ const testPage = String.raw`<!doctype html>
   </body>
 </html>`;
 
-async function main() {
+/** Installs the packed artifact so omitted package files fail the check. */
+async function main(wasmFilename) {
   const browser = findBrowser();
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "rive-webgl2-package-"));
   try {
@@ -460,7 +474,7 @@ async function main() {
       imageBindingFixturePath,
       join(temporaryDirectory, "image-binding-fixture.riv"),
     );
-    await writeFile(join(temporaryDirectory, "index.html"), testPage);
+    await writeFile(join(temporaryDirectory, "index.html"), testPage(wasmFilename));
 
     const server = await startServer(temporaryDirectory);
     try {
@@ -491,7 +505,7 @@ async function main() {
             `${result.browserMessages?.join("\n") ?? ""}\n${browserResult.stderr}`,
         );
       }
-      console.log("Packed WebGL2 browser test passed.", result);
+      console.log("Packed WebGL2 browser test passed:", wasmFilename, result);
     } finally {
       await server.close();
     }
@@ -500,4 +514,8 @@ async function main() {
   }
 }
 
-await main();
+for (const wasmFilename of process.env.RIVE_TEST_WASM
+  ? [process.env.RIVE_TEST_WASM]
+  : ["rive.wasm", "rive_fallback.wasm"]) {
+  await main(wasmFilename);
+}
