@@ -63,8 +63,8 @@ Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 
 ## Pet loading benchmark
 
-See [the September 16 results](benchmarks/pets-2026-09-16.md) for methodology,
-raw measurements, validation, and the local build artifact. To repeat, unpack
+Raw measurements and asset/package hashes are retained in `benchmarks/`;
+the upgrade PR records the findings and validation limits. To repeat, unpack
 the published baseline package into a directory, then run this command from a
 Magic Circle Nix development shell (which supplies Playwright's browser):
 
