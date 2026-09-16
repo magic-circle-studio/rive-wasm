@@ -51,14 +51,24 @@ let mockStateMachines: rc.StateMachineInstance[];
 
 let cleanupRiveListenersFunction: (() => void) | null;
 
+// Mirrors the real `advanceAndReportChanges` wiring in rive.ts: a single call
+// advances (and drains events/data-binding callbacks for) every state machine.
+// Forwarding to advanceAndApply lets tests assert how many synchronous advances
+// a pointer sequence triggers.
+const mockAdvanceAndDrain = jest.fn((elapsedTime: number) => {
+  mockStateMachines.forEach((sm) => sm.advanceAndApply(elapsedTime));
+});
+
 const createCanvasAndRiveListeners = ({
   isTouchScrollEnabled,
   dispatchPointerExit,
   enableMultiTouch,
+  stateMachineCount = 1,
 }: {
   isTouchScrollEnabled?: boolean;
   dispatchPointerExit?: boolean;
   enableMultiTouch?: boolean;
+  stateMachineCount?: number;
 } = {}) => {
   canvas = document.createElement("canvas") as HTMLCanvasElement;
   canvas.width = 500;
@@ -66,14 +76,17 @@ const createCanvasAndRiveListeners = ({
   canvas.style.width = "500px";
   canvas.style.height = "500px";
 
-  mockStateMachines = [
-    {
-      pointerDown: jest.fn(),
-      pointerMove: jest.fn(),
-      pointerUp: jest.fn(),
-      pointerExit: jest.fn(),
-    } as unknown as rc.StateMachineInstance,
-  ];
+  mockStateMachines = Array.from(
+    { length: stateMachineCount },
+    () =>
+      ({
+        pointerDown: jest.fn(),
+        pointerMove: jest.fn(),
+        pointerUp: jest.fn(),
+        pointerExit: jest.fn(),
+        advanceAndApply: jest.fn(),
+      }) as unknown as rc.StateMachineInstance,
+  );
 
   cleanupRiveListenersFunction = registerTouchInteractions({
     canvas,
@@ -86,10 +99,12 @@ const createCanvasAndRiveListeners = ({
     isTouchScrollEnabled,
     dispatchPointerExit,
     enableMultiTouch,
+    advanceAndDrain: mockAdvanceAndDrain,
   });
 };
 
 beforeEach(() => {
+  mockAdvanceAndDrain.mockClear();
   createCanvasAndRiveListeners();
 });
 
@@ -253,3 +268,255 @@ test("touchend event with multiple touch events with multi touch disabled only t
   expect(mockStateMachines[0].pointerExit).toHaveBeenCalledTimes(1);
   expect(mockStateMachines[0].pointerMove).not.toBeCalled();
 });
+
+// #region same-frame pointer advance (advanceAndApply(0) on pointer down/up)
+
+test("mousedown triggers a synchronous advanceAndApply(0)", (): void => {
+  canvas.dispatchEvent(
+    new MouseEvent("mousedown", { clientX: 100, clientY: 100 }),
+  );
+
+  expect(mockStateMachines[0].pointerDown).toBeCalledWith(100, 100, 0);
+  expect(mockAdvanceAndDrain).toHaveBeenCalledTimes(1);
+  expect(mockAdvanceAndDrain).toBeCalledWith(0);
+  expect(mockStateMachines[0].advanceAndApply).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].advanceAndApply).toBeCalledWith(0);
+});
+
+test("mouseup triggers a synchronous advanceAndApply(0)", (): void => {
+  canvas.dispatchEvent(
+    new MouseEvent("mouseup", { clientX: 100, clientY: 100 }),
+  );
+
+  expect(mockStateMachines[0].pointerUp).toBeCalledWith(100, 100, 0);
+  expect(mockAdvanceAndDrain).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].advanceAndApply).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].advanceAndApply).toBeCalledWith(0);
+});
+
+test("a same-frame touchstart + touchend advances the state machine twice (once per pointer event)", (): void => {
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint],
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+  canvas.dispatchEvent(
+    new TouchEvent("touchend", {
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+
+  expect(mockStateMachines[0].pointerDown).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].pointerUp).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].advanceAndApply).toHaveBeenCalledTimes(2);
+  expect(mockStateMachines[0].advanceAndApply).toHaveBeenNthCalledWith(1, 0);
+  expect(mockStateMachines[0].advanceAndApply).toHaveBeenNthCalledWith(2, 0);
+});
+
+test("pointer move does not trigger a synchronous advance", (): void => {
+  canvas.dispatchEvent(
+    new MouseEvent("mousemove", { clientX: 100, clientY: 100 }),
+  );
+
+  expect(mockStateMachines[0].pointerMove).toBeCalledWith(100, 100, 0);
+  expect(mockAdvanceAndDrain).not.toHaveBeenCalled();
+  expect(mockStateMachines[0].advanceAndApply).not.toHaveBeenCalled();
+});
+
+// #endregion
+
+// #region single-touch primary finger tracking
+
+test("in single-touch mode, a second finger touchstart does not invoke pointerDown", (): void => {
+  // Establish the primary finger
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint],
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+  expect(mockStateMachines[0].pointerDown).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].pointerDown).toBeCalledWith(100, 100, 0);
+
+  // Second finger touches while the first is held
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint, mockTouchPoint2],
+      changedTouches: [mockTouchPoint2],
+    }),
+  );
+
+  expect(mockStateMachines[0].pointerDown).toHaveBeenCalledTimes(1);
+});
+
+test("in single-touch mode, a touchmove from the second finger does not invoke pointerMove", (): void => {
+  // Establish the primary finger
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint],
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+
+  // Only the second finger moves; primary is stationary so only secondary is in changedTouches
+  canvas.dispatchEvent(
+    new TouchEvent("touchmove", {
+      touches: [mockTouchPoint, mockTouchPoint2],
+      changedTouches: [mockTouchPoint2],
+    }),
+  );
+
+  expect(mockStateMachines[0].pointerMove).not.toBeCalled();
+});
+
+test("in single-touch mode, the primary finger position is used when both fingers appear in changedTouches with the secondary finger listed first", (): void => {
+  // Establish primary finger (id=0)
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint],
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+
+  const movedPrimary = { clientX: 150, clientY: 150, identifier: 0 } as Touch;
+  const movedSecondary = { clientX: 250, clientY: 250, identifier: 1 } as Touch;
+
+  // Both fingers moved simultaneously; secondary (id=1) is at changedTouches[0]
+  canvas.dispatchEvent(
+    new TouchEvent("touchmove", {
+      touches: [movedPrimary, movedSecondary],
+      changedTouches: [movedSecondary, movedPrimary],
+    }),
+  );
+
+  expect(mockStateMachines[0].pointerMove).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].pointerMove).toBeCalledWith(150, 150, 0);
+  expect(mockStateMachines[0].pointerMove).not.toBeCalledWith(250, 250, 1);
+});
+
+test("in single-touch mode, a touchend from the second finger does not invoke pointerUp or pointerExit", (): void => {
+  // Establish the primary finger
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint],
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+
+  // Second finger lifts; primary is still held
+  canvas.dispatchEvent(
+    new TouchEvent("touchend", {
+      touches: [mockTouchPoint],
+      changedTouches: [mockTouchPoint2],
+    }),
+  );
+
+  expect(mockStateMachines[0].pointerUp).not.toBeCalled();
+  expect(mockStateMachines[0].pointerExit).not.toBeCalled();
+});
+
+test("in single-touch mode, the primary finger still invokes pointerUp after the secondary finger has already lifted", (): void => {
+  // Establish the primary finger
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint],
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+
+  // Second finger lifts first (should be ignored)
+  canvas.dispatchEvent(
+    new TouchEvent("touchend", {
+      touches: [mockTouchPoint],
+      changedTouches: [mockTouchPoint2],
+    }),
+  );
+  expect(mockStateMachines[0].pointerUp).not.toBeCalled();
+
+  // Primary finger lifts
+  canvas.dispatchEvent(
+    new TouchEvent("touchend", {
+      touches: [],
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+
+  expect(mockStateMachines[0].pointerUp).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].pointerUp).toBeCalledWith(100, 100, 0);
+  expect(mockStateMachines[0].pointerExit).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].pointerExit).toBeCalledWith(100, 100, 0);
+});
+
+test("in single-touch mode, a new primary touch can be established after the previous primary finger lifts", (): void => {
+  // First gesture with finger 1 (id=0)
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint],
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+  canvas.dispatchEvent(
+    new TouchEvent("touchend", {
+      touches: [],
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+
+  jest.clearAllMocks();
+
+  // Second gesture with finger 2 (id=1) — should become the new primary
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint2],
+      changedTouches: [mockTouchPoint2],
+    }),
+  );
+  canvas.dispatchEvent(
+    new TouchEvent("touchmove", {
+      touches: [mockTouchPoint2],
+      changedTouches: [mockTouchPoint2],
+    }),
+  );
+
+  expect(mockStateMachines[0].pointerDown).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].pointerDown).toBeCalledWith(200, 200, 1);
+  expect(mockStateMachines[0].pointerMove).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].pointerMove).toBeCalledWith(200, 200, 1);
+});
+
+test("touchcancel clears the primary touch ID so the next touchstart restores full interactivity", (): void => {
+  // Establish primary finger (id=0)
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint],
+      changedTouches: [mockTouchPoint],
+    }),
+  );
+
+  // OS cancels the touch (incoming call, iOS gesture recognizer, etc.) — no touchend fires
+  canvas.dispatchEvent(new TouchEvent("touchcancel"));
+
+  jest.clearAllMocks();
+
+  // User touches again; browser assigns a new identifier (id=1)
+  canvas.dispatchEvent(
+    new TouchEvent("touchstart", {
+      touches: [mockTouchPoint2],
+      changedTouches: [mockTouchPoint2],
+    }),
+  );
+  canvas.dispatchEvent(
+    new TouchEvent("touchmove", {
+      touches: [mockTouchPoint2],
+      changedTouches: [mockTouchPoint2],
+    }),
+  );
+
+  expect(mockStateMachines[0].pointerDown).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].pointerDown).toBeCalledWith(200, 200, 1);
+  expect(mockStateMachines[0].pointerMove).toHaveBeenCalledTimes(1);
+  expect(mockStateMachines[0].pointerMove).toBeCalledWith(200, 200, 1);
+});
+
+// #endregion

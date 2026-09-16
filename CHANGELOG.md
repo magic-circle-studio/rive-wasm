@@ -5,10 +5,690 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.35.2](https://github.com/rive-app/rive-wasm/compare/2.35.1...2.35.2)
+## [2.42.2](https://github.com/rive-app/rive-wasm/compare/2.42.1...2.42.2)
+
+### Fixed
+
+- fix(Cmdq): Suppress value callbacks for failed property reads (#14078) c09464b052 [`#470`](https://github.com/rive-app/rive-android/issues/470)
 
 ### Commits
 
+- feat(runtime): add command queue font data binding (#13405) 880afe5687 [`a047758`](https://github.com/rive-app/rive-wasm/commit/a0477589f5d0a979c5d3990d405d6b388332d68e)
+- feat(editor,runtime): author-controlled word breaking on text (#14172) 1a54eafd1e [`501d2b2`](https://github.com/rive-app/rive-wasm/commit/501d2b24293dde300acf48a72782ece3077afe51)
+- fix(ore): apply bound vertex buffers under the current pipeline, guard wasm draws (#14163) a30921151e [`c286917`](https://github.com/rive-app/rive-wasm/commit/c286917406d095930c08c4d741bb6e5d8b7aa134)
+- fix(scroll): drag threshold for new scroll constraints, and no fling when content fits (#14165) f8a17aa43a [`ec29d1c`](https://github.com/rive-app/rive-wasm/commit/ec29d1ce5d299e9b759aaaeae31101e52ed84813)
+- feat(wasm): os.date and runtime string.format for the assemblyscript library (#14162) 05a3b72fe9 [`d57ba41`](https://github.com/rive-app/rive-wasm/commit/d57ba418bf4ba539079bac096236073761060a1f)
+- perf(renderer): Single exit from unpack_tessellated_path_vertex() (#14141) ce124a773e [`02b7c7f`](https://github.com/rive-app/rive-wasm/commit/02b7c7f40279d819a9cae7d4d882a34dc58d1550)
+- feat(renderer) : Add additive blending (#14051) 77a122fbb0 [`f66fb86`](https://github.com/rive-app/rive-wasm/commit/f66fb864e87ee1c09e3139c1b38eb78b8e3b5d0a)
+- Nnnnn improve load performance (#14149) 1d51731ef0 [`efb4583`](https://github.com/rive-app/rive-wasm/commit/efb4583e6339ccebef0b13b2daf18167375f67c0)
+- fix(editor,runtime,cli) (#14151) 1d567b30ab [`a26ceb6`](https://github.com/rive-app/rive-wasm/commit/a26ceb62261e3ba1cbd0e9de581b8f66fe5456ac)
+- feat(wasm): audio and node data surface for assemblyscript scripts (#14153) 0050835bb9 [`680b106`](https://github.com/rive-app/rive-wasm/commit/680b10667c8424410c6bb8204bf6f20a7cea0d12)
+- Rive CLI: rigging diagnostics (named verify errors, decoded inspect, two runtime crash fixes) (#14137) 2e25993fe5 [`b6595cc`](https://github.com/rive-app/rive-wasm/commit/b6595ccc9fc74219233bb39b08168d7c8c7fba29)
+- fix(command-queue): preserve parent listener when releasing list children (#14138) cf297a3880 [`2586270`](https://github.com/rive-app/rive-wasm/commit/258627051ca4de3691a229962d34d47df599acbc)
+- fix(cli): rml and cli fixes (#14133) 0a79ccbd4f [`f78d12c`](https://github.com/rive-app/rive-wasm/commit/f78d12c44c985b17830d26b5e796d45f0d141ed4)
+- feat(cli): improvements to keyboard input and focus (#14129) 10e8c5874e [`658e751`](https://github.com/rive-app/rive-wasm/commit/658e7519cfce3a1ad369cbb0462c58845be6b67b)
+- perf(runtime): stop DependencySorter copying and shifting per component (#14130) 3eb9df63bc [`f9b6869`](https://github.com/rive-app/rive-wasm/commit/f9b6869fe22d127e0ea62ac57d3fb0ee5f68e290)
+- fix(runtime,recorder): stop artboard audio when no engine is assigned (#14107) e0f985d128 [`735ad4f`](https://github.com/rive-app/rive-wasm/commit/735ad4f68b209e0f910ba6843668e19f19e7baab)
+- feat(text): unicode line breaking (#14113) 2432604068 [`668d256`](https://github.com/rive-app/rive-wasm/commit/668d2566f1c9006d3a0d227da613428935759c2d)
+- feat(renderer): Add ability to clip against stroked paths (#14090) cbcf536e4c [`e44a148`](https://github.com/rive-app/rive-wasm/commit/e44a148bc9cca9879486852ce5b718693b6504f0)
+- Chore(Renderer): Hybrid premult (#13969) 789960dd5a [`a198298`](https://github.com/rive-app/rive-wasm/commit/a1982981ea651481a297217c308f7ba5e6e52b56)
+- Nnnnn cache components as bitmap (#13778) 121398eae3 [`c2b2632`](https://github.com/rive-app/rive-wasm/commit/c2b26325faeff519635b5727ebda870d7137bf71)
+- feat(image paint and transition protocol) (#13763) 7219a2d76e [`67a4445`](https://github.com/rive-app/rive-wasm/commit/67a44454b0a39477cb90dcfb59a2c8c50845d51a)
+- fix(wasm): request a major collection on handle growth before warning (#14097) 37a6d9cb68 [`820bed6`](https://github.com/rive-app/rive-wasm/commit/820bed63c00c5e9f02ee2a6e934da11edf2e4000)
+- fix(ore): clear instead of load on a never written vulkan texture (#14087) 2d96efeede [`661dbaa`](https://github.com/rive-app/rive-wasm/commit/661dbaa9a470b7bdfd682a0ac2c06aa1cec1183c)
+- feat(evi,cli): Integrated macOS title bar with native traffic lights (#14086) aa4c17a6cf [`4eca41e`](https://github.com/rive-app/rive-wasm/commit/4eca41e5e4fa27bd0c6e37d0112f86877b214186)
+- fix(ore): keep vulkan depth test on for always compare writes (#14089) 554ba2e7e2 [`149f254`](https://github.com/rive-app/rive-wasm/commit/149f2547d6e0e8210294267b8637f60b25cebd2a)
+- cleanup(renderer): Delete NEVER_GENERATE_PREMULTIPLIED_PAINT_COLORS (#14085) 3f8420dbaf [`0b82e2a`](https://github.com/rive-app/rive-wasm/commit/0b82e2aacc062a95567f60cf7f7c87189d669941)
+
+## [2.42.1](https://github.com/rive-app/rive-wasm/compare/2.42.0...2.42.1) - 2026-09-10
+
+### Commits
+
+- chore: tag 2.42.1 [`d1e45a0`](https://github.com/rive-app/rive-wasm/commit/d1e45a0a3b8f7355b8f0b768acdeef2b80892534)
+- fix(text): measure a fitFontSize text at its fitted size (#14074) 2505c4bb9c [`e0bfcec`](https://github.com/rive-app/rive-wasm/commit/e0bfcec3ccd0f1dee01686776da68f439a95cbfa)
+- feat(cli): debug AssemblyScript scripts in the preview (#14047) c5874e1044 [`8209048`](https://github.com/rive-app/rive-wasm/commit/82090488b215f5c12114a65b20c8d4bbebf78837)
+- fix(renderer): render GL canvas targets top down (#14059) acc1e5016d [`b7d181c`](https://github.com/rive-app/rive-wasm/commit/b7d181c378d1953db952c6525561723328b1a25c)
+- feat(renderer): Implement "msaa1" modes (#13964) 131951d4d4 [`9d87919`](https://github.com/rive-app/rive-wasm/commit/9d8791973d7b0c2021683393a629122dbe6a8153)
+- fix(cli): Fix crash and pointer positions in Windows viewer (#14070) 2c4d9a91a2 [`d6d223d`](https://github.com/rive-app/rive-wasm/commit/d6d223db1719140e35a4c942970af37cc14f3610)
+- fix(renderer): Fix assert with dynamic state enabled (#14058) f9b508d875 [`f97bc10`](https://github.com/rive-app/rive-wasm/commit/f97bc10f131fda5e9301bae1f4fbd9b30661eeee)
+- chore(runtime): Add [[nodiscard]] to some AABB functions (#14035) 2b02c3bacb [`fac9748`](https://github.com/rive-app/rive-wasm/commit/fac97480c94e822afaffc5025e01de433ffd96e5)
+- Check golds refactor (#13965) 0173b0daa6 [`f8e6e5b`](https://github.com/rive-app/rive-wasm/commit/f8e6e5bf6d3e96efa66f1344942e339aa3d0f33e)
+- feat(scripting): wasm scripting and prelinked aot for artemis (#13876) 17390ee227 [`338cd25`](https://github.com/rive-app/rive-wasm/commit/338cd250ad2b150f6e91cd9c40852d8d0ea591a0)
+- fix(ore): reject a uniform buffer shorter than the shader's block (#14044) dc8aa9cbcc [`6c96b4b`](https://github.com/rive-app/rive-wasm/commit/6c96b4b918a6801c2252aae98b4ce2321642e28e)
+- feat(cli): luau script debugger for vs code (#14017) 5ceb65b029 [`2633afa`](https://github.com/rive-app/rive-wasm/commit/2633afafc89d59c769161704bb163e428a8d33d5)
+- fix(web): write decoded image pixels through wasmMemory (#14036) 67ea382322 [`2fa8b14`](https://github.com/rive-app/rive-wasm/commit/2fa8b140732f9d86edfe2087ebb64aad6fcb4e73)
+- feat(data): bind view model instance values in lists (#13998) 43d66a1b34 [`e5cd8df`](https://github.com/rive-app/rive-wasm/commit/e5cd8dfcd4c745b7eb40f01fa9c9737b03c7a1bd)
+- feat(wasm): 2d canvas for the assemblyscript library (#14003) 08a4ca3bb9 [`ece4e3b`](https://github.com/rive-app/rive-wasm/commit/ece4e3bbe5c629dc256c0dd7bffa433d05ac8a1f)
+- feat(cli): semantics authoring support (#13944) c343828fbe [`5d6ba49`](https://github.com/rive-app/rive-wasm/commit/5d6ba49123f149d46f848359efadcd1559eda000)
+- feat(ore): nestable script render passes (#14001) 5e4ad7e34e [`4a81d38`](https://github.com/rive-app/rive-wasm/commit/4a81d38af5e39a59f3d8fd81d8c3a281c9c5f888)
+- fix(runtime): reclaim only the canvas frames and render pass a script… (#13996) f5f2a5c824 [`52045f2`](https://github.com/rive-app/rive-wasm/commit/52045f2e07de769797d435b88ea286bdcf1af17c)
+- fix(runtime): hold one data context per DataBindContainer (#13929) a8b09b6b40 [`d1b1a94`](https://github.com/rive-app/rive-wasm/commit/d1b1a941a4f3c4b9b63ae3f3d4ae60e68717c5ed)
+- feat(editor): text input playback capture + layout-aware placement (#13972) 15c001515b [`09f94d1`](https://github.com/rive-app/rive-wasm/commit/09f94d1e83e5ab45b67312dac4f757dbc106af70)
+- feat(text): select all on keyboard focus and selectAllOnFocus (#13997) 4b89f3eea6 [`f7bd3bb`](https://github.com/rive-app/rive-wasm/commit/f7bd3bb174458cc8b3c7b570c2c80401310e650b)
+- feat(scripting): @input artboard and view model kinds typed by class, with @input("name") renames (#13993) dd77cc28cf [`25480fa`](https://github.com/rive-app/rive-wasm/commit/25480fad31769f41ed07117de5d22a0a2933dbcf)
+- feat(scripting): assemblyscript rive library with artboard, data binding, paint, path and events (#13992) 2d863a5854 [`bf472b0`](https://github.com/rive-app/rive-wasm/commit/bf472b0b6b833b0eb8d99b1c09a48ada05c1af9d)
+- feat(scripting): pin the debug tier so sync-o0 boots stay on -O0 (#13978) f7fd4b5d04 [`36fa02e`](https://github.com/rive-app/rive-wasm/commit/36fa02e8c269288c423d2b90143aefa6176297ec)
+- feat(scripting): sync aot boot compiles at load instead of running interp (#13976) ef43b97105 [`2021d5b`](https://github.com/rive-app/rive-wasm/commit/2021d5bfbe7c65405c8f5e0832c7e899a2f14c1f)
+- perf(renderer): Compile out atomic shaders on android (#13985) 9092512ab0 [`a7059b3`](https://github.com/rive-app/rive-wasm/commit/a7059b3777c9e18cb24f001d13418b029a38c1bf)
+- fix(runtime): stop layouts reading uninitialized interpolator pointers (#13970) a87af1c977 [`f63ef94`](https://github.com/rive-app/rive-wasm/commit/f63ef94e5adcd03528e656594b2ef8314a7b4b99)
+- feat: Add fit to parent layout toggle on NestedArtboardLeaf (#13977) e46ec77959 [`7ba3daa`](https://github.com/rive-app/rive-wasm/commit/7ba3daa394d01ddfd0eb8f3a9fe3c033f09c7fb3)
+- fix(scripting): boot wamrc artifacts of vm_host, compile the ladder from pristine bytes (#13958) 87109f7956 [`c099f23`](https://github.com/rive-app/rive-wasm/commit/c099f23dcf3fed1221a5becb49fed77297650c82)
+- fix(scripting): reserve x18 in wamrc artifacts for apple and windows aarch64 (#13956) b7a396a8da [`f9266b7`](https://github.com/rive-app/rive-wasm/commit/f9266b73ecab813191448570549a1634a6092af1)
+- feat(flutter): first-class semantics opt-in and stability fixes (#13892) 9311d9445b [`f8f2356`](https://github.com/rive-app/rive-wasm/commit/f8f2356aa9637d2d7b450a20151d0edc8febb93c)
+- fix(renderer): Reset the GL color mask in Ore before clearing (#13893) b33e0ef17d [`9ccb099`](https://github.com/rive-app/rive-wasm/commit/9ccb0996cc52a316e22cd8994efa7b48d8d57203)
+- fix(renderer): Get stroke/feathered paths working with image paint in atomic mode (#13952) 1d33b08f44 [`2b05ff1`](https://github.com/rive-app/rive-wasm/commit/2b05ff1805f39ab66b855fc47143c75027b31250)
+- feat(Android): Synchronous deferred rendering with GPU canvas (#13442) 622f60fe50 [`c23e701`](https://github.com/rive-app/rive-wasm/commit/c23e7014fa698f02c88bc91a6454a79cf14afc60)
+- fix(renderer): Add partial support for image paint to atomic mode (#13907) 601805c212 [`ff32fb9`](https://github.com/rive-app/rive-wasm/commit/ff32fb943c046ab322afac9cb9cbe26ade6457af)
+- feat(cli): watermark .riv exports with a bundled pre-roll artboard (#13930) 3162948820 [`2b12be1`](https://github.com/rive-app/rive-wasm/commit/2b12be19dfd99d79700063085dc693a2a7f3875c)
+- feat(command-queue): apply global asset changes to all loaded files (#12954) cfd611f559 [`b9f5fc5`](https://github.com/rive-app/rive-wasm/commit/b9f5fc571ddec39bff44dcf3495c7b57b5c4e801)
+- fix(runtime): read the header file id at full 64 bit width (#13900) 11ef1543e1 [`0dbd927`](https://github.com/rive-app/rive-wasm/commit/0dbd927357de82eabda4fb141cc0d15e74920927)
+- perf(runtime): shrink StateMachineLayerInstance and LinearAnimationInstance (#13894) 51f34f0bfb [`c476c8f`](https://github.com/rive-app/rive-wasm/commit/c476c8f0de5ac64b11dc5826780e8c67bffd738d)
+- chore(goldens): gate --deferred on RIVE_CANVAS, not scripting (#13902) ec359aee6a [`584654d`](https://github.com/rive-app/rive-wasm/commit/584654d17f628fdc4b8a1b718b413c12cc3866f1)
+- feat(Renderer): Allow GMs in testing to use Uber shader or not (#13626) f0c2d52b31 [`3077c32`](https://github.com/rive-app/rive-wasm/commit/3077c32fcbee6665e27b9f96352fa7438c6ad5e5)
+
+## [2.42.0](https://github.com/rive-app/rive-wasm/compare/2.41.1...2.42.0) - 2026-09-02
+
+### Commits
+
+- chore: tag 2.42.0 [`9290fb8`](https://github.com/rive-app/rive-wasm/commit/9290fb809aabb9580148854aaae17db4a4fc95eb)
+- feat(wasm): synchronous deferred rendering for webgl2 and canvas2d (#13450) ad527a507e [`cb8b0d6`](https://github.com/rive-app/rive-wasm/commit/cb8b0d6a679746c77e33bee3f47a0fb749e25b9c)
+
+## [2.41.1](https://github.com/rive-app/rive-wasm/compare/2.41.0...2.41.1) - 2026-09-01
+
+### Commits
+
+- chore: tag 2.41.1 [`0c5af63`](https://github.com/rive-app/rive-wasm/commit/0c5af63634a5267a740417c662b17d1132e319dc)
+- chore(vulkan): Add Vulkan frame sync coordinator (#13058) bcdfe4fe5f [`4ebb27c`](https://github.com/rive-app/rive-wasm/commit/4ebb27c8e39c5e21210f1e60b13d3d56f2c9f104)
+- feat(runtime): report successful view model instance lookups (#13875) 1c69c3de41 [`3526380`](https://github.com/rive-app/rive-wasm/commit/35263808eefb5597262adfeccd765cd0aac8bdfe)
+- feat(runtime): gate the wasm tier ladder behind tools builds (#13882) 314202c0f2 [`9dd2e46`](https://github.com/rive-app/rive-wasm/commit/9dd2e46c649f06632ab9a9330b78e2cead857a1e)
+- fix(runtime): keep pre-7.3 files on the legacy text sizing path (#13886) 9fe2b415a7 [`8bfc506`](https://github.com/rive-app/rive-wasm/commit/8bfc506c09acb94dfef4957e07f5af09b2c8364f)
+- chore(renderer): split ImageDrawInstance (#13746) 636e181568 [`324d9b8`](https://github.com/rive-app/rive-wasm/commit/324d9b81f1978b864224e270807da1768859106f)
+- feat(scripting): frame generational collector for wasm scripts (#13869) 0613f5b262 [`2676b15`](https://github.com/rive-app/rive-wasm/commit/2676b154db7a7150954638f10bf24aed49257dcf)
+- chore(editor): add some small features and improvements (#13887) 6066a2edc0 [`1afe46c`](https://github.com/rive-app/rive-wasm/commit/1afe46c8a6ce416460048ffc2651736ee60362ef)
+- test(layout): add a generated layout conformance matrix (#13870) c3f33e5c04 [`d69a6e4`](https://github.com/rive-app/rive-wasm/commit/d69a6e40fc01e25899119a3b9a1783d67a911d92)
+- feat(rive-cli): build and run on windows (#13880) 95154f6907 [`be2d3a6`](https://github.com/rive-app/rive-wasm/commit/be2d3a6369b193f18b53b6db961e2b9b0a36ccdb)
+- fix(runtime): keep focus on a leaf as visibility changes (#13848) b261e90067 [`7e123e5`](https://github.com/rive-app/rive-wasm/commit/7e123e5520f8c7df847f4c6126e4daf02392e878)
+- fix: Stop a constraint discarding a nested artboard's origin (#13855) c2dd421f6a [`fe23264`](https://github.com/rive-app/rive-wasm/commit/fe23264e1faa9833140532473a9b2d6789a0cdce)
+- feat(scripting): layout resize and surface scale for assemblyscript protocols (#13849) f239d55c5c [`a004be9`](https://github.com/rive-app/rive-wasm/commit/a004be9bf1ac6d968040e961b2bcef448ade0dc7)
+- feat(unreal): Artemis 2 framebuffer fetch support (#13838) b40bf7760e [`41c6fcb`](https://github.com/rive-app/rive-wasm/commit/41c6fcb6eace7a92711fd678fb127f3cb64d482d)
+- fix(editor_native): render coop files faithfully on the native editor stage (#13829) f1ca57510e [`d9bfc83`](https://github.com/rive-app/rive-wasm/commit/d9bfc83e0c77c986188f8745434bf51cd66c162f)
+- fix(renderer): Work around Adreno 530 driver bugs (#13833) 71e9c6a055 [`d898ce9`](https://github.com/rive-app/rive-wasm/commit/d898ce95a0563f03d46b85046a401ddb172f3775)
+- feat(Android): Accessibility semantics (#13783) ef32137d74 [`e4a804a`](https://github.com/rive-app/rive-wasm/commit/e4a804aafb58da8e9ed7542db76213b5c4893b36)
+- fix(runtime): own the FocusManager on the artboard, not the state machine (#13830) ce1fc479e8 [`dd2ee9b`](https://github.com/rive-app/rive-wasm/commit/dd2ee9bf81f560db97fd6fde93bd642accbbdb9c)
+- feat(apple): add opt-in gpu canvas support to the Concurrency API (#13676) 7924855ea3 [`b0091dd`](https://github.com/rive-app/rive-wasm/commit/b0091dd86124e4a7cbeb83a2657e24fbdb55ab04)
+- fix(rive-cli): drain autoreleased drawables on the deferred render thread (#13818) 25bbf3ee6a [`f134043`](https://github.com/rive-app/rive-wasm/commit/f1340438790915c9ac3e8327f7c2e6c28000664c)
+- fix(js): Parse checked semantic state as a single value, not 2 independent bit flags (#13814) 3ac56c1897 [`e0f47b8`](https://github.com/rive-app/rive-wasm/commit/e0f47b87ce9f48ede0c980a8f0e3604ac26b6e21)
+- feat(Runtime): Add GMs for SVG renderer (#13647) 83e416ed15 [`630af62`](https://github.com/rive-app/rive-wasm/commit/630af6279d0791e393117c91cb0b9e178786c01d)
+- feat(text_input): obscured mode for password entry (#13785) e53cfbe655 [`1d5ca37`](https://github.com/rive-app/rive-wasm/commit/1d5ca37c25c625b6e5523a18737223b4d5bdd53f)
+- refactor(renderer): Rename InterlockMode::msaa -&gt; depthStencil (#13807) c0abfa2ee7 [`0f3e19d`](https://github.com/rive-app/rive-wasm/commit/0f3e19d519b863f21ae97ffb5daff6202797d848)
+- feat(command-queue): add focus traversal (#13501) 42c3f6efef [`e9704ae`](https://github.com/rive-app/rive-wasm/commit/e9704ae39743ba8948086b426065bbe7b5075894)
+- chore(semantic): make semantic check state bindable (#13804) 40c1d72941 [`d3b6882`](https://github.com/rive-app/rive-wasm/commit/d3b688208665ae5140936ba42e1f919842aaf157)
+- chore(renderer): Eliminate redundant set entries in minify.py (#13790) 6fd7b5d78f [`cafa3d5`](https://github.com/rive-app/rive-wasm/commit/cafa3d5fee5c535e3272aec9db32952f9bf17c3b)
+- feat(gl): Implement dynamic state on GL (#13779) 1bde1cb854 [`1db098a`](https://github.com/rive-app/rive-wasm/commit/1db098a753fea7d0572910472653f92c12342947)
+- fix(runtime): high surrogate calculation for SMP chars in UTF::ToUTF16 (#13789) 6d8968a21d [`5a1151e`](https://github.com/rive-app/rive-wasm/commit/5a1151e72317b55f344eedbdad8f7dcdb5ac6817)
+- feat(runtime): Add GMs for canvas 2D (#13571) 416c5f2ae2 [`aa9ae94`](https://github.com/rive-app/rive-wasm/commit/aa9ae94704c4cfbc736781812991c6222cc3a524)
+
+## [2.41.0](https://github.com/rive-app/rive-wasm/compare/2.40.1...2.41.0) - 2026-08-26
+
+### Commits
+
+- chore: tag 2.41.0 [`f659d18`](https://github.com/rive-app/rive-wasm/commit/f659d18bd86e2e2c11dc22f95d72ff5300505337)
+- perf(ore): lend scratch FBO/VAO to GL render passes instead of minting per pass (#13757) aa6d454839 [`6de63f3`](https://github.com/rive-app/rive-wasm/commit/6de63f3c400c8f2262b243d96ac2c375e0b01e9c)
+- feat(text input): add more text input properties (#13761) ed7059fc0b [`8bf8d50`](https://github.com/rive-app/rive-wasm/commit/8bf8d5032b0d05cae8d700cd7dad0f609a8210a5)
+- fix: Fix forward declare use issue for ore::context (#13737) 6debf52e7d [`d611b67`](https://github.com/rive-app/rive-wasm/commit/d611b67791c43ab282e3cc1f58ec36a920347d91)
+- bug: check for animator before running animator.stop (#13775) 7be51ecfb7 [`40c222b`](https://github.com/rive-app/rive-wasm/commit/40c222bf6666b7e189b755c1f87e40dcb0c059d2)
+- Revert "bug: check for animator before running animator.stop (#378)" [`a0fe814`](https://github.com/rive-app/rive-wasm/commit/a0fe814ba4b2b3b4425d085d3b437fc1a815e320)
+- perf(runtime): shrink StateMachineInstance and DataBindContainer (#13697) d13f76fdc4 [`f418733`](https://github.com/rive-app/rive-wasm/commit/f4187333958f67d474f91ed6fb03750d14d7d48b)
+- feat(scripting_workspace): rasc format, definitions, tests protocol and in-memory bake (#13701) daa3a2ec88 [`5aaa322`](https://github.com/rive-app/rive-wasm/commit/5aaa3222c68fda42a4b8c2c9560936c14862314e)
+- chore: Address layout consistency items (#13692) 1da7f74c5b [`6a51373`](https://github.com/rive-app/rive-wasm/commit/6a51373304f5d64c28a856ac0c04edfd563b22e2)
+- fix(focus): stop a destroyed FocusData leaving a live node in the foc… (#13678) f663d597cb [`65d42ea`](https://github.com/rive-app/rive-wasm/commit/65d42eaaaabc8d158561d52308b33f36c00d6d4c)
+- feat(scripting): arena-epoch reaping of wasm module handles (#13698) 554ba71bef [`367507c`](https://github.com/rive-app/rive-wasm/commit/367507c82c0a789b2d63b5ca5b3040022572bacc)
+- fix: Honor a nested artboard's fill/hug inside grid/stack layouts (#13685) b6eba932c6 [`978d9e5`](https://github.com/rive-app/rive-wasm/commit/978d9e58819b0c7b0a34ee0d78d4b28cc31fa47b)
+- refactor(rasc): move rasc under one package so its downstream ci mirrors from mono (#13671) d8604cbf13 [`070991d`](https://github.com/rive-app/rive-wasm/commit/070991df28c1e0ca3cfab10b35d89cb47da15713)
+- fix(unreal): raster order mode fix. (#13658) 56da77ec1c [`48ad4e8`](https://github.com/rive-app/rive-wasm/commit/48ad4e83e6a4c007469b104f146ca62ce81939d2)
+- feat(scripting): wasm script execution lane (#13595) e6598b59db [`c91898d`](https://github.com/rive-app/rive-wasm/commit/c91898d8a0bcb24dc19e0a1c16a0d15cff0e563a)
+- fix: Layouts propagate size down to solo children (#13656) 2f12e4ae15 [`7d62219`](https://github.com/rive-app/rive-wasm/commit/7d622192b2d62076343073ff7fb361c7764bd04f)
+- fix(ore): let a pipeline take its vertex and fragment from different shader files (#13646) a156d37294 [`a1dd79a`](https://github.com/rive-app/rive-wasm/commit/a1dd79a512675ef31d388685915fe67057b0027c)
+
+## [2.40.1](https://github.com/rive-app/rive-wasm/compare/2.40.0...2.40.1) - 2026-08-20
+
+### Commits
+
+- chore: tag 2.40.1 [`3a0405f`](https://github.com/rive-app/rive-wasm/commit/3a0405f262eb24e875e2bca7b4609bb086a8e4f6)
+- fix(renderer): Include ubershaders for dynamic-state DrawTypes (#13619) 3a60a0f69d [`d1fa312`](https://github.com/rive-app/rive-wasm/commit/d1fa31259e16151742eb6ca42cc730dff4754d60)
+- fix(focus): gamepad input fixes (#13649) 3de152d473 [`d344aab`](https://github.com/rive-app/rive-wasm/commit/d344aab78d7a9eff41c7cf2bbc851743c0227dda)
+- feat(Android): Asset manifest (#13651) 688b6ed4a0 [`3c2b373`](https://github.com/rive-app/rive-wasm/commit/3c2b373a7b656b5ae9e4d3fe62926a5988097a68)
+- chore(runtime): shrink LayoutComponent per-instance memory (#13565) e776cb3cc5 [`7f290ad`](https://github.com/rive-app/rive-wasm/commit/7f290adee5a304101929d1e590f64a17e49ec32b)
+- feat(editor): clipboard copy/cut/paste in Rive-based artboard header (#13641) a8f3a6828c [`9269da0`](https://github.com/rive-app/rive-wasm/commit/9269da02ba9bd177cac3e84a2d76e255714b64a1)
+- fix(gms): build the canvas dag gms without scripting (#13643) c3bd820e64 [`192f6d5`](https://github.com/rive-app/rive-wasm/commit/192f6d58c8d4dcf672c451d2412700c4131d17f1)
+- fix(runtime): rehome semantics when a data-bound nested artboard swaps (#13633) 16f53812e8 [`d6f091e`](https://github.com/rive-app/rive-wasm/commit/d6f091ea0118ff1fc3655de70f711cefd5056e21)
+- chore(editor): Enable layout transforms (#13632) 6369d54dc7 [`eae6857`](https://github.com/rive-app/rive-wasm/commit/eae68571f64405f71adbf9f6bab9949035a95a33)
+- fix(js): blur Rive focus on Rive domain blur. Ensure internal Rive cleared focus allows DOM to move on (#13615) dd7a165c5b [`f4489af`](https://github.com/rive-app/rive-wasm/commit/f4489af93737718bd133b8b70a8d921fea1bf85c)
+- feat(deferred): allocate canvas backings at replay, not at record (#13604) 610f9a3366 [`765aae8`](https://github.com/rive-app/rive-wasm/commit/765aae8e0959fc93be079deeea141bdaa30f83cb)
+- fix(scripting): route the device off the import factory, not the command server's (#13605) 7e613062a0 [`e2a0126`](https://github.com/rive-app/rive-wasm/commit/e2a0126a4bb541fb1215ba1d7e1c0e8045b72a41)
+- fix(text): make feather work on text style backgrounds (#13611) 54fe0949ab [`7d210ee`](https://github.com/rive-app/rive-wasm/commit/7d210eee695ba1e9fe4a1707abc3a8d3b3250683)
+- feat(unreal): initial deferred renderer support (#13602) e7b57f6bad [`6fe3c6e`](https://github.com/rive-app/rive-wasm/commit/6fe3c6ee1db8b2a071c97b16b02ddbb692a207ba)
+- refactor(unreal) msaa mode for android with engine patches for performance (#13527) 3026fa99a0 [`9ef71a7`](https://github.com/rive-app/rive-wasm/commit/9ef71a7e6f6f92c8a3df7f2060da563a9cf5b259)
+- fix(renderer): fail Vulkan init gracefully instead of aborting (#13546) edc6b5c78c [`82480d0`](https://github.com/rive-app/rive-wasm/commit/82480d03629174986239b45692b14adfaca6e447)
+- fix(unreal): Unreal random fixes (#13593) 54b48a70ae [`e9c4e93`](https://github.com/rive-app/rive-wasm/commit/e9c4e93e2bd564754a791e6d5cec66d1572008dd)
+- fix: Grid, core int type fixes (#13580) 584f66bc95 [`49a04f7`](https://github.com/rive-app/rive-wasm/commit/49a04f7812ba7c5ad3ddb29dced9948b4facb8b4)
+- fix(runtime): resolve data-bound keyframe values on all playback paths (#13579) f997139aa3 [`87d5ca5`](https://github.com/rive-app/rive-wasm/commit/87d5ca5dcc0eca109d3e7bd99689e3ec06b0cd1e)
+- chore(text): scale font attributes with fitFontSize (#13572) 77e027c061 [`76229e9`](https://github.com/rive-app/rive-wasm/commit/76229e9420e934b730215ce9ceebb628f9088ff7)
+- feat(ore): bake bind group layout identity into the shader sidecar (#13577) 4d73f37a3d [`5c7337c`](https://github.com/rive-app/rive-wasm/commit/5c7337c20643da5eeeecf429f86f9167791a8e22)
+- refactor(ore): derive bind group layouts from shaders at the ore layer (#13566) d93e7c98b2 [`f600f75`](https://github.com/rive-app/rive-wasm/commit/f600f75ada71ab05924034330f29a7c4f97b2314)
+- chore: rev luau to rive_0_734 (#13561) ba609f1a74 [`816a04b`](https://github.com/rive-app/rive-wasm/commit/816a04ba2e99e5380720843506b68c096e259ec2)
+- perf(runtime): write layout styles into the yoga node directly (#13438) 976a024a33 [`74feed4`](https://github.com/rive-app/rive-wasm/commit/74feed4358f5938030480a53f35475f3f971f175)
+- fix(web): build every heap view from wasmMemory (#13574) 0490b73a17 [`97bbe87`](https://github.com/rive-app/rive-wasm/commit/97bbe87c7de95c1a3b78066ac33b30a243a253dd)
+- chore(renderer): Update GrTriangulator to skia:fee7272f5b (#13570) 16992a5769 [`d76c03a`](https://github.com/rive-app/rive-wasm/commit/d76c03a6d4436afd6e6de262fe1006e78a758b9c)
+- feat(renderer): Implement interior triangulation for MSAA (#13535) 4e97bffbd8 [`836336b`](https://github.com/rive-app/rive-wasm/commit/836336ba89334f35a5c000858b1a4456dca5d538)
+- chore(viewer): add support for recording an interaction session with … (#13551) a764fff4f6 [`8ae4a44`](https://github.com/rive-app/rive-wasm/commit/8ae4a449c66f6de79d0c4abef17472c6bc9c8b35)
+- fix(Android): Silently handle other asset classes (#13462) cde6977172 [`f7624d9`](https://github.com/rive-app/rive-wasm/commit/f7624d985e2f3fb6395f331875c6ed63dae4663b)
+
+## [2.40.0](https://github.com/rive-app/rive-wasm/compare/2.39.2...2.40.0) - 2026-08-14
+
+### Commits
+
+- chore: tag 2.40.0 [`8143708`](https://github.com/rive-app/rive-wasm/commit/814370888ce77cdcef54ad8b1deac87770469844)
+- fix(deferred): construct the path geometry test session from caps (#13553) ee809ba7f0 [`1e93918`](https://github.com/rive-app/rive-wasm/commit/1e9391880df1d501b98d165d2db89284025462eb)
+- fix(renderer): drop empty segments from recorded and scripted geometry (#13550) bd16ad7c56 [`79c696a`](https://github.com/rive-app/rive-wasm/commit/79c696a6cae99e936fc31b0e9778a01850ca8245)
+- refactor(deferred): caps are the only way to construct a session (#13547) 7c5552a159 [`b5d2e79`](https://github.com/rive-app/rive-wasm/commit/b5d2e79d3b49cd1f9f86f62542c602cfb1ac855b)
+- feat(scripting): report shader bake failures in the problems panel, and rev naga to 30 (#13517) 6be5324af7 [`d1cc807`](https://github.com/rive-app/rive-wasm/commit/d1cc8072a97550c39092775beab5bac678694902)
+- fix(editor): focus brackets track the focused element through host-side motion (#13531) 20a1155662 [`f75baf1`](https://github.com/rive-app/rive-wasm/commit/f75baf154e49267f807197b892464797cf75a622)
+- feat(editor): interpolatable color channels with bitmask passthroughs (#13532) 2e258b0fcb [`138380a`](https://github.com/rive-app/rive-wasm/commit/138380a7e076fb18a2f49e42865c56bf7cf310da)
+- chore(build): Bump the build_rive.sh emsdk version to 4.0.23 (#13536) 002824f2d3 [`16af7fe`](https://github.com/rive-app/rive-wasm/commit/16af7fe78ecdf64f56231ac139c40be2e07aa7ce)
+- refactor(deferred): carry replay device caps as data, recording never holds the device (#13537) a51af172cb [`3d693b6`](https://github.com/rive-app/rive-wasm/commit/3d693b68e610e94b5c27cf9da14e18e77182eb71)
+- feat(js): bump emscripten to 4.0.23 and add -Os linker optimization (#13375) 1588036da0 [`f8c9b7e`](https://github.com/rive-app/rive-wasm/commit/f8c9b7e084bc566151e5a68cd928385239499deb)
+- fix: Proper handling of components and artboard lists in layout stack (#13519) 26581e759f [`3e74f1e`](https://github.com/rive-app/rive-wasm/commit/3e74f1e564167222155fa2c22f2384d281e952fa)
+- fix(ore): apply gl sampler state to the units the shader actually samples from (#13498) 0bcde60fa2 [`6433998`](https://github.com/rive-app/rive-wasm/commit/6433998b93f948af924b2f9c44bf22d38352c974)
+- feat: Add support for layout translation offset & compat with all constraints (#13418) 504b4ece0d [`d592fe2`](https://github.com/rive-app/rive-wasm/commit/d592fe24f7ba94679203984e98b65489f6acbc97)
+- chore: refactor deferred host layer for the runtimes, and a deferred player (#13439) 0683749ce0 [`8823f1d`](https://github.com/rive-app/rive-wasm/commit/8823f1d90f2d8f1e30190bb4f7f147d08edce289)
+- feature(rive-cli): the Rive command line tool (#13112) 098135fb37 [`7622351`](https://github.com/rive-app/rive-wasm/commit/76223514558c40612f81d4c2dbb8ae2b75a61799)
+- feat(renderer): Begin adding image to RenderPaint (#13337) cea8da5875 [`8a6eb82`](https://github.com/rive-app/rive-wasm/commit/8a6eb820a45aca89b00ea2973a77f90c36451636)
+- feature: image sampler filter and wrap options on assets and image nodes (#13428) f192e02d5f [`0c7fd07`](https://github.com/rive-app/rive-wasm/commit/0c7fd07058d738e5308dcf7f2a2118ad024e58cf)
+- chore(runtime): store rarely-set Core properties in lazy sidecars (#13415) 586ddfa997 [`feef73d`](https://github.com/rive-app/rive-wasm/commit/feef73dec11c342ef16ba590d2002c8212c32f6b)
+- feat(runtime and editor): expose global view models to Lua scripts (#13420) 37b731d146 [`9df9cf8`](https://github.com/rive-app/rive-wasm/commit/9df9cf897709e1c0cdee174c74b2d02a6f1e1862)
+- chore: Reset legacy layout transforms (#13400) 6dec243962 [`4bd0cec`](https://github.com/rive-app/rive-wasm/commit/4bd0cec46ca3b8a8964e6a885284c40ffff02474)
+- refactor(gms): Testing framework reactor (#13371) b1e4c061ec [`30423ff`](https://github.com/rive-app/rive-wasm/commit/30423ff927819f42d4fffdfa9d74dd21ec0287bc)
+- chore(ci): count gms runs toward coverage (#13387) c6de07afe5 [`dbfb4b0`](https://github.com/rive-app/rive-wasm/commit/dbfb4b0ab216066c2b42f1457e477ce57b5ef01c)
+- feat(editor and runtime): per-channel (R/G/B/A) passthrough color pro… (#13324) 20db61d6e7 [`a51c1cf`](https://github.com/rive-app/rive-wasm/commit/a51c1cf13291798bb940021bdd266d7e6d789f49)
+- feat(deferred): one session per render context, multi target replay, and the context tier deleted (#13368) e9f24d0296 [`bb5c527`](https://github.com/rive-app/rive-wasm/commit/bb5c527d6050cca7e2bc18a9c5c43d7e82758949)
+- fix(runtime): prevent IK constraint pose pop from stale FK base (#13301) e17fbf4aa8 [`a608659`](https://github.com/rive-app/rive-wasm/commit/a6086590db4162df15aac45fb69ec8bd73fcda11)
+
+## [2.39.2](https://github.com/rive-app/rive-wasm/compare/2.39.1...2.39.2) - 2026-08-04
+
+### Commits
+
+- chore: tag 2.39.2 [`68dbf3a`](https://github.com/rive-app/rive-wasm/commit/68dbf3a775df37fc4a6f128fb685eb9ed4bf149b)
+- feat(editor): instance TextInput from a library, bundled into the edi… (#13345) 289d353ac5 [`00efe34`](https://github.com/rive-app/rive-wasm/commit/00efe346b9e20193a290edaf62812f65f7d52972)
+- feat: Allow clipping to shapes with path effects (#13356) 0c254772d2 [`657028a`](https://github.com/rive-app/rive-wasm/commit/657028aa7c3053c37d736dea4ac19a11da8a72e5)
+- build: pin macOS deployment floor at link time (minos) (#13341) 5df57079b5 [`916be15`](https://github.com/rive-app/rive-wasm/commit/916be1575d311e701214c2c48651e68c73a89b70)
+- feature: text style backgrounds with corner rounding (#13338) 5cdcaab570 [`6ab954a`](https://github.com/rive-app/rive-wasm/commit/6ab954a74a71091aad485d1d8f614e4e2f5fa583)
+- fix(renderer): Disable VK_EXT_color_write_enable on Adreno and PowerVR (#13300) 3b27c1c696 [`e066302`](https://github.com/rive-app/rive-wasm/commit/e0663021e0ac2cdbc313861a6e5a2fb4eef7e46a)
+- fix(js): make sure global view model instances have observability on their property values (#13343) 3ef275bfaa [`1fa6174`](https://github.com/rive-app/rive-wasm/commit/1fa61748af3f697e5f8ee7ef04e0f441e6fe932c)
+- chore: single non-root updatePass for the layout-fit leaf reflow (#13329) 6485df5f2d [`987348f`](https://github.com/rive-app/rive-wasm/commit/987348f97fa097cdb0e7d7ab399019e4b6682c3f)
+- feature: FileFormat protocol (#13275) f82054a61f [`cd51a36`](https://github.com/rive-app/rive-wasm/commit/cd51a361fd83f943a0ac377753e162e623be8249)
+- fix(scripting): stable identity for asset Property.value reads (#13326) eaf1c9dcb6 [`bc3e382`](https://github.com/rive-app/rive-wasm/commit/bc3e382ee849fdbd62500471e280452e6812d15d)
+- feat(cmdq+unreal) asset blob support (#13327) 7316a7b1c4 [`2524dde`](https://github.com/rive-app/rive-wasm/commit/2524ddeb057b55244327830da3ec47e4013115ef)
+- chore: run Unreal gms/goldens on win-runner-01 (UE 5.7) (#13310) b22111c1db [`2f9ee71`](https://github.com/rive-app/rive-wasm/commit/2f9ee71240aa914553d6a1dfe94d2925c90aafab)
+- fix(renderer): Don't dither when alpha == 0 (#13309) 797918509f [`1a4eff7`](https://github.com/rive-app/rive-wasm/commit/1a4eff72e143f2509c9407ef8e47bf05f2b88b92)
+- feat: add blob view-model data binding with script access (#13297) 2ebcaa259c [`98d74eb`](https://github.com/rive-app/rive-wasm/commit/98d74eb62a85a9f6cf9e131a2b4315a5441d9fba)
+- chore(runtime): Build layout backgrounds without a Rectangle (#13320) 0420a01877 [`12584af`](https://github.com/rive-app/rive-wasm/commit/12584af5bf246f33196bb8f9728f7a4bacb2334b)
+- fix(unreal): rhi msaa update (#13321) c5e5fea584 [`df0ccea`](https://github.com/rive-app/rive-wasm/commit/df0ccea3cf106d5549fd738b8ac7e08ca89267a2)
+- fix(runtime): prevent use-after-free when remapping text-run listeners (#13317) 665fbe83c0 [`18b4206`](https://github.com/rive-app/rive-wasm/commit/18b4206c383119eb92c0f4bd204365544118796b)
+- feat: Layout improvements (#13033) 1d47d5a857 [`98d8884`](https://github.com/rive-app/rive-wasm/commit/98d888435de1421766653dc9de1f89bcba923a19)
+- fix(js): fix github release notes template to match other runtimes template (#13222) 8dd57832fa [`0983f06`](https://github.com/rive-app/rive-wasm/commit/0983f06e9bf7386db679c1c1febb561e51b25b6f)
+- fix(unreal): RHI vulkan atomics was broken now it's not. (#13281) 38ad1ef498 [`9a3ca5f`](https://github.com/rive-app/rive-wasm/commit/9a3ca5f9cce0fe16cf3ed0abf06ef93cd0b5730c)
+- fix(renderer): Make interior triangulations cacheable (#13252) 9e498b2635 [`6d99a6e`](https://github.com/rive-app/rive-wasm/commit/6d99a6ec28d71846c94467f7ccbc2933d703c4df)
+- fix(runtime): propagate render image/font when data binding into a ne… (#13284) b8c8df7cf4 [`37594f1`](https://github.com/rive-app/rive-wasm/commit/37594f1b88d58cda5ca5d8a17a41872d689c6946)
+- feat(build): More tweaks for Incredibuild (#13263) a89a351b4b [`f19367a`](https://github.com/rive-app/rive-wasm/commit/f19367a53a7224a0ba9ec73ed21f19db27544226)
+- fix(rive_native): windows fence wait thread use after free and join deadlock on teardown (#13248) 4512342b3b [`c9e3999`](https://github.com/rive-app/rive-wasm/commit/c9e399956ab4bdb1f1301f848a423e0b1a26d223)
+- feat(wgpu): Hook up GL blend & msaa exensions (#13240) b1240d8ad7 [`def1935`](https://github.com/rive-app/rive-wasm/commit/def1935370b43d661c8e1c419f3acfe5d9ce4df5)
+- refactor(Unreal): check golds refactor (#13246) 6c1e5ce40d [`a8ef19f`](https://github.com/rive-app/rive-wasm/commit/a8ef19fc4e4a2d77b74a03f1cc683b938c423c9a)
+- fix(feather): Remove inner feather when converting fill to stroke (#13239) d991cbd65b [`2890795`](https://github.com/rive-app/rive-wasm/commit/2890795007b95a15b18e76d70aaf22a60d065b8c)
+- fix(runtime): skip non-solo-set children when data binding a solo by … (#13243) bbaae8e464 [`ff58535`](https://github.com/rive-app/rive-wasm/commit/ff5853554dd911d449c5ae681b4712e02633ebaf)
+- perf(vulkan): Combine MSAA fast-path fill subpasses, +47% on Adreno 750 (#13227) 0ab7665690 [`4780c7b`](https://github.com/rive-app/rive-wasm/commit/4780c7b30cb2fa4a0c8c6938952828bca061eb44)
+- refactor(unreal): Ue build linux (#13209) fb62252e58 [`b76d2d6`](https://github.com/rive-app/rive-wasm/commit/b76d2d6cd274f6eb92919da3eb32592fadc17043)
+- fix(runtime): harden file import against truncated/corrupt input (#13221) 7052067aef [`369dcda`](https://github.com/rive-app/rive-wasm/commit/369dcda510a61f565de58f20e8af128018315f7e)
+- chore: rev Luau to rive_0_731 (upstream 0.731) (#13232) 2ea12e7438 [`eda9bf6`](https://github.com/rive-app/rive-wasm/commit/eda9bf65ebaaaf3ca9ba4d3ef07b49c779398044)
+- feature: font data binding from Luau scripts (#13230) 25347a39e4 [`d9881b0`](https://github.com/rive-app/rive-wasm/commit/d9881b08022f948e8a35ce96fe9ca3910b68c12f)
+- feat(runtime): add opacity and transform (rotation/scale) support on … (#13224) 76284ae1ea [`3bcfa53`](https://github.com/rive-app/rive-wasm/commit/3bcfa53ce122678a011e1fbb699e7274b491ff79)
+- fix: host-bound view models bind through riveLuaPushArtboard (#13229) b144bfbfb3 [`ef5f1ac`](https://github.com/rive-app/rive-wasm/commit/ef5f1ac71c1721d43f503424cdc9479dec18c40b)
+- chore: Ensure text sizes to its parent layout with min/max sizes applied (#13223) 61c50c6f87 [`263437c`](https://github.com/rive-app/rive-wasm/commit/263437c64c256a35dc75f1ef2a12b9882749f00c)
+- feat(build): Add support for Incredibuild (#13213) 44509e3c52 [`cad25e5`](https://github.com/rive-app/rive-wasm/commit/cad25e5595085b50d51a1149cb9338a6ae2e0a3d)
+- fix(runtime): Image computed width/height always returned 0 (#13219) aaf9a7f344 [`8cf33dc`](https://github.com/rive-app/rive-wasm/commit/8cf33dcb5a07b94a8b1f1311a0a76199a9852111)
+- fix(runtime): propagate opacity and layout to paused nested artboards (#13210) 284d33e8cd [`d0fe055`](https://github.com/rive-app/rive-wasm/commit/d0fe0551c7a545bad7057e6de31b903129f7cc44)
+- Nested view model properties mint the referenced type from scripts (#13208) 50c75768ff [`353e667`](https://github.com/rive-app/rive-wasm/commit/353e667701a6a901e5d906d3b4451c19dfdc90fa)
+
+## [2.39.1](https://github.com/rive-app/rive-wasm/compare/2.39.0...2.39.1) - 2026-07-23
+
+### Commits
+
+- chore: tag 2.39.1 [`a7629a9`](https://github.com/rive-app/rive-wasm/commit/a7629a91010ef99f05629f1fd1836a08afcf2cbd)
+- fix(js): Add new semantics folder types to each npm folder's files (#13206) fcc05484ae [`c8fd52f`](https://github.com/rive-app/rive-wasm/commit/c8fd52f58b8626188bc3d1ddc75aa55b5fd4cb3b)
+- fix: virtualized scroll sizing/overscroll and view model listener event fixes (#13200) b9d702b78d [`185fc17`](https://github.com/rive-app/rive-wasm/commit/185fc17f1f4a818cd25eda8e0767136526c83dca)
+- chore: rev Luau to rive_0_730 (upstream 0.730) (#13190) d9a71b90b5 [`2af4a6a`](https://github.com/rive-app/rive-wasm/commit/2af4a6ad70a26add1e09ac1008c4ac751462baee)
+- chore(js): add github releases to release process for js/wasm runtime alongside tags (#13158) 281b46387e [`6f30375`](https://github.com/rive-app/rive-wasm/commit/6f303754d5c7af5f0f58c7876ef37e1591224011)
+- fix(runtime): guard scripted data converter against unhydrated instance (#13185) 6898043c1e [`2a41f9f`](https://github.com/rive-app/rive-wasm/commit/2a41f9f631948695f0ab4fd9cac6358fca2bca23)
+- fix(scripting): Copy thread data to async coroutines (#13188) 2b3e2f0686 [`df4e23b`](https://github.com/rive-app/rive-wasm/commit/df4e23bcde129aa29ca1f898d6be752d6336f718)
+- refactor(unreal): Unreal ore gm support step 1 (#13172) b66482739b [`327497b`](https://github.com/rive-app/rive-wasm/commit/327497b8304b4b20fb49c1a1a910ed59b73faa66)
+- fix(runtime): Crash when databound Artboard resolves to null (#13175) 2d9f6d3fbe [`12fc887`](https://github.com/rive-app/rive-wasm/commit/12fc88786945041022f1f0998928dc16ee88c99b)
+- feat(editor): bidirectional binding for stateful component properties (#13159) 3d671afd9c [`2b1cf21`](https://github.com/rive-app/rive-wasm/commit/2b1cf21bce38b809e2f482a57d2a550d72621434)
+- Advertise colorBufferHalfFloat on the Metal backend (#13160) a144d9df03 [`4f9cb9f`](https://github.com/rive-app/rive-wasm/commit/4f9cb9f0dcb0e00ce4b0adb1228427a49bfba943)
+- feature: tree-shake unused scripts from runtime export (#13150) f92794960a [`df1a7b7`](https://github.com/rive-app/rive-wasm/commit/df1a7b7e96139d55c879f29b669081ab94890427)
+
+## [2.39.0](https://github.com/rive-app/rive-wasm/compare/2.38.5...2.39.0) - 2026-07-21
+
+### Commits
+
+- chore: tag 2.39.0 [`b808ebe`](https://github.com/rive-app/rive-wasm/commit/b808ebea808ff420a30d1fdc41f2ecb195f7ea63)
+- patch(cpp): add focus dirty flag to prevent unnecessary tree walks on hasFocusNodes each frame (#13126) 0cf838a9ec [`2586730`](https://github.com/rive-app/rive-wasm/commit/25867305d44f854d53e1f3b7173a68eb90ef0a11)
+- chore(unreal): better gm support for unreal (#13139) ac92e5b5fb [`d65e60b`](https://github.com/rive-app/rive-wasm/commit/d65e60be2b2c39c26446211eff9faa8ba1e03736)
+- Tag ore GM shader modules with fixture asset ids (#13148) 504ea98308 [`d861a19`](https://github.com/rive-app/rive-wasm/commit/d861a19c097c28fa03e8501e1647f3d1b0b81b5d)
+- chore(global view models): add unset methods (#13144) df03a957ba [`a70eead`](https://github.com/rive-app/rive-wasm/commit/a70eead0e032f3202d3c3a4871bb2c78bc51105b)
+- scripting: statically link library requires (#13134) 4c6b7ed8a2 [`ad15f28`](https://github.com/rive-app/rive-wasm/commit/ad15f2834c26ca69e24b4d8c9e51d14aaeb243c1)
+- Performance tab updates (#13080) 4fd600f16c [`50e3bd9`](https://github.com/rive-app/rive-wasm/commit/50e3bd99898beb55475b71d017fe7aca05e5d92f)
+- chore: Textinput improvements (#13130) e1b960c043 [`d402a73`](https://github.com/rive-app/rive-wasm/commit/d402a739037c802155c88162797a0801b557696c)
+- feat(web): implementation for semantics (#12723) 4dcb7f3580 [`b7c8f19`](https://github.com/rive-app/rive-wasm/commit/b7c8f19ccf5786e673e775c202489c120af11b35)
+- refactor(unreal): Rive Descriptor Editor Update (#13129) f1ca2e4394 [`592a044`](https://github.com/rive-app/rive-wasm/commit/592a044a470901fe25158728570cf25e573f1c63)
+- chore(renderer) some renames (#13109) 9716c48826 [`c484075`](https://github.com/rive-app/rive-wasm/commit/c4840754f90df3c85136883d5902f87b1d84aa92)
+- chore(js): Log a GH issue if npm publishing fails for any npm package during publish workflow (#13119) 868ed5a6c5 [`7833756`](https://github.com/rive-app/rive-wasm/commit/783375652d7e091ef277f94e5308f6c98b794da5)
+- chore(runtime and editor): advance cycle updates (#13120) 343c6e3dab [`1d2409a`](https://github.com/rive-app/rive-wasm/commit/1d2409a6f8ce90d3c511024fafb0fa2603aa1fdf)
+- fix(ci): Generate thumbnails for the goldens landing page (#13083) 7a78062e63 [`14918d8`](https://github.com/rive-app/rive-wasm/commit/14918d84258939bb5b70763eab26617c27b3c8a9)
+- feature: data binding keyframes (#13097) 864d68d032 [`d958673`](https://github.com/rive-app/rive-wasm/commit/d9586732273e0a315ae4b50c4079de729435d226)
+- fix(tests): Run android test apps in landscape on TVs (#13103) e94936fac8 [`29962a8`](https://github.com/rive-app/rive-wasm/commit/29962a8df9e7a4c13dad9f1844cab291af13e0e5)
+- fix: add focus nodes on nested artboards to main focus tree when added to main artboard (#12788) 90140f105b [`c8aad83`](https://github.com/rive-app/rive-wasm/commit/c8aad83e9ec869e65df2038a7300a1073940900f)
+- fix: Text opacity modifier falloff with feathering applied (#13089) 476a0f6f85 [`4ef67ed`](https://github.com/rive-app/rive-wasm/commit/4ef67edd4b33582443725f3dec4365ced13d6d5d)
+- scripting: library scope follow ups (#13088) 9bcb8fe4a7 [`f64e617`](https://github.com/rive-app/rive-wasm/commit/f64e6170892db6dc970b8fc28332a6fc132d71a7)
+- feat(webgpu): support WebGPU compatibility mode (#12949) 5d05097962 [`19f6402`](https://github.com/rive-app/rive-wasm/commit/19f64028d61b4ff92cac9e28943b2c5ebe899601)
+- fix(runtime): Prevent use-after-free in ScriptedDataConverter type changes (#13107) d7280b6962 [`8eeda39`](https://github.com/rive-app/rive-wasm/commit/8eeda396c5ec192532dcf52cd21f2678f1789b08)
+- fix(renderer) Tighten the combined draw bounds (#13093) a39edb59ab [`28f4e61`](https://github.com/rive-app/rive-wasm/commit/28f4e612b5fdf6a2e9637405f967b6993fb2c902)
+- fix: Crash on software mode emulators (#13067) a5bf12c58e [`1c7c169`](https://github.com/rive-app/rive-wasm/commit/1c7c1693bda1f9c6660b68f83c9a3eaa952a273b)
+- perf(tests): Don't pre-pass drawCanvases in player yet (#13104) 9c7a56dfc0 [`fa59854`](https://github.com/rive-app/rive-wasm/commit/fa59854f829b69c706cce73c2345418bcbd7df03)
+- fix: VM trigger only fires once in script hosted artboard (#13096) c7ec04d45d [`44eae27`](https://github.com/rive-app/rive-wasm/commit/44eae278c4908d0041b4ad54821663a36f857958)
+- chore: Capture intended values with scrollIndex and scrollPercent (#13084) 9ebf0f88df [`e1a063e`](https://github.com/rive-app/rive-wasm/commit/e1a063e3fbb638284ec692ad80a6af9bd190425a)
+- scripting: library scope for imported scripts (#13054) d24376c1d6 [`8957a19`](https://github.com/rive-app/rive-wasm/commit/8957a19d1b9e33c88f1f76ea7cc5a4b0e813cfe8)
+- fix(global view models): fixes (#13087) 5868c1ba5f [`f933dba`](https://github.com/rive-app/rive-wasm/commit/f933dbaff84a27fb3b8aabea4a2ac03161403155)
+- fix(editor): make scripting vm ref counted on artboards (#13085) 9aeb2e571b [`4892678`](https://github.com/rive-app/rive-wasm/commit/4892678df11fd5e1109bc7d812d2b706233c293b)
+- feat(Android): VMI name (#13079) 2a59ec434e [`7e007e8`](https://github.com/rive-app/rive-wasm/commit/7e007e80f7f05427607983b4221b64c370ce4876)
+- feat(UAT): Global View Models (#12888) f564fe7c61 [`647c9de`](https://github.com/rive-app/rive-wasm/commit/647c9deca82bad9bfca4903eaaf5845087cc2307)
+- feat(renderer): Convert "ImageDrawUniforms" to "ImageDrawInstance" (#12990) bb61acd900 [`8aef2f5`](https://github.com/rive-app/rive-wasm/commit/8aef2f5d6fc87740668dcac875bfe2e422287df0)
+- fix(runtime): Only apply the originating direction of a bidirectional bind (#13069) cf605e8083 [`5287f23`](https://github.com/rive-app/rive-wasm/commit/5287f23cdf531b81f3158fc139a97d103d2cc5ba)
+- feat(renderer): Optimized scissor and clip rejection (#12965) 7e203ecdbc [`2ed3641`](https://github.com/rive-app/rive-wasm/commit/2ed36412387232e5bee2a1bb3226686d63efb600)
+- feature(runtime and editor): add support to override artboard origin (#13062) 1d4b62e857 [`941b6da`](https://github.com/rive-app/rive-wasm/commit/941b6da256a2a383e4ac29cff821b3e25729521a)
+- fix(scripting): decode lua colors as unsigned integers (#13053) 991f5d87ab [`deb1431`](https://github.com/rive-app/rive-wasm/commit/deb1431e009ab1cb505f88b4021e297829ba1493)
+- feat(runtime): add requestArtboardSize to command queue (#12854) d3fe2f47e6 [`91ca440`](https://github.com/rive-app/rive-wasm/commit/91ca4403649d7df6050e2fdf0657b2a68309df5c)
+- fix(shaders): stabilize cross-stage HLSL names, per-stage id fallbacks collided and silently dropped the struct-layout sidecar (#13046) 662780d846 [`e4c98ce`](https://github.com/rive-app/rive-wasm/commit/e4c98cedb4cc10ef8af5f60b83a0da6452b6312e)
+- fix(editor and runtime): arboard selection and state machine selection (#13049) 6150d71336 [`111cc8a`](https://github.com/rive-app/rive-wasm/commit/111cc8ad0271017f884466c0c3d8c1b0f973e4e2)
+- feat(focus): ui pass 1 (#13029) 72963a4d12 [`8d6b1d9`](https://github.com/rive-app/rive-wasm/commit/8d6b1d9be7a0953a8ac6e0ce0d82172134cc1580)
+- fix(unreal): Unreal layout alignment fix and other small things (#13028) b20256f368 [`3074807`](https://github.com/rive-app/rive-wasm/commit/30748072bfa4e61863c6bf8110d05d6dadafeed0)
+- feature: add data bind font support (#13031) 25b5033ad8 [`3227bb9`](https://github.com/rive-app/rive-wasm/commit/3227bb98da2f19155bbce9b393bf4b80cdaf8878)
+- feat(cpp): expose enum name in getProperties for cpp and js (#13032) ced1506e5b [`2f60f80`](https://github.com/rive-app/rive-wasm/commit/2f60f80203cf59533c8813366d3021f166cf72af)
+
+## [2.38.5](https://github.com/rive-app/rive-wasm/compare/2.38.4...2.38.5) - 2026-07-08
+
+### Commits
+
+- chore: tag 2.38.5 [`761c318`](https://github.com/rive-app/rive-wasm/commit/761c318fb4931f18852e07cedb49ef4053843bd6)
+- fix(peon_worker): Handle vulkan initialization errors in gpu recorder (#13035) 37997d7366 [`fc180dd`](https://github.com/rive-app/rive-wasm/commit/fc180dd0347ab46a87cbb90e6b3d89987b5dc46a)
+- chore(runtime): add new core type (#12981) ac4657c21c [`9687c86`](https://github.com/rive-app/rive-wasm/commit/9687c8634b0d375e0f80aa0acff46d9431e69452)
+- fix(js): add miniaudio to Closure externs to prevent cross-runtime audio clash (#13017) 48df83c484 [`d573456`](https://github.com/rive-app/rive-wasm/commit/d57345685a201efd953773a935b5222819ca9e46)
+- chore(runtime): expose data bind runtime methods (#13018) eb0c54ee20 [`507405f`](https://github.com/rive-app/rive-wasm/commit/507405fd975755c6ea94f22cf8987ae1219b86ab)
+- perf(tests): Spawn image_diff.py only once per job (#13013) c4ea178471 [`82ff2ef`](https://github.com/rive-app/rive-wasm/commit/82ff2efdd4f533dc7147a1d7045529303cc4ecc9)
+- fix(build): Don't compile metal shaders for android or wasm (#13015) 19d8fb7957 [`edb8279`](https://github.com/rive-app/rive-wasm/commit/edb82799f75a0bcfd1d8efe9f213ce3b6972b191)
+- fix(runtime): ensure lua data is initialized (#13010) e27bf13d74 [`0c7181d`](https://github.com/rive-app/rive-wasm/commit/0c7181d3bdc107d0ae1f46ee19a941d370b3f049)
+- feature: test.blob(name) reads blob assets from test scripts (#13005) afd68206e6 [`c2d5dc6`](https://github.com/rive-app/rive-wasm/commit/c2d5dc68c5d7244f496ce0ebda29ebef3ff4c951)
+- fix(scripting): Advance detached view model instances at end of frame (#13002) a77c1355bd [`5c60809`](https://github.com/rive-app/rive-wasm/commit/5c60809c034c613286278ae5bf8f934988cedced)
+- feat(scripting): 3D Vector ops, Mat4 lookAt/ortho, Vector buffer writes, GPUBuffer write source range (#13003) ef0e100413 [`f524730`](https://github.com/rive-app/rive-wasm/commit/f524730aeb0f4b92b5507df365eafd4413230c4b)
+- feature (Unreal) Ore Support (#12941) eeb280d7f9 [`2f40bb6`](https://github.com/rive-app/rive-wasm/commit/2f40bb64d3dbfae916401c36b3c25dc8e7356070)
+- chore: rev Luau to rive_0_728 (upstream 0.728) (#13000) e4c22c3ef7 [`600e35d`](https://github.com/rive-app/rive-wasm/commit/600e35d9f60bd3c74686271e69983ef3442ae551)
+- fix(runtime): validate bindablePropertyInstance before using it (#12989) e2c7b48dc0 [`d32afbb`](https://github.com/rive-app/rive-wasm/commit/d32afbb5af675ee1f92129852781f9e02ad53f11)
+- Texture compression fixups (#12939) a23e2ba586 [`66da7b7`](https://github.com/rive-app/rive-wasm/commit/66da7b7e4ebe9f41329eb039b3b14c618f310b41)
+
+## [2.38.4](https://github.com/rive-app/rive-wasm/compare/2.38.3...2.38.4) - 2026-07-01
+
+### Commits
+
+- chore: tag 2.38.4 [`1d7d829`](https://github.com/rive-app/rive-wasm/commit/1d7d8292fcc4e8d49a25b89ba451c183a1d4c996)
+- feat(editor - text input): expose trigger property to focus on text i… (#12975) 50fdb3bb9f [`ff5fdbd`](https://github.com/rive-app/rive-wasm/commit/ff5fdbda432b3838615402c299bac682e742d73c)
+- fix(runtime-focus): resolve focus to first leaf on direct focus (#12974) d607980229 [`b164d37`](https://github.com/rive-app/rive-wasm/commit/b164d37c771741e9fd09973882bc0422570d6803)
+- feat(image): compose layout fit as a separate scale so user scale stays independent (#12896) c372d0d9d4 [`36fb99a`](https://github.com/rive-app/rive-wasm/commit/36fb99af1d4ee2c3a49f8c7a6b5fbf92e44ae916)
+- fix: ore buffer per-frame update race (#12976) cc34cea963 [`dc8e0ed`](https://github.com/rive-app/rive-wasm/commit/dc8e0ed2ffcb6fb070f0fec2b269bfb86617a8ec)
+- feat(apple): add semantics support (#12642) 9f3eef8634 [`d82357f`](https://github.com/rive-app/rive-wasm/commit/d82357f7da6d554a73ee6d7573729812e0fa7598)
+- feat(runtime): add semantics command queue api (#12198) bd587cb83f [`d4d9933`](https://github.com/rive-app/rive-wasm/commit/d4d9933cf28397332cb6cc2c71521e31b1bf2a62)
+- feat: add artboard volume to command queue/server (#12816) 88115b0949 [`e7a7980`](https://github.com/rive-app/rive-wasm/commit/e7a79809ad46362587e8600d590b147f7fe76567)
+- Rev Luau to rive_0_726 (upstream 0.726) (#12953) 61822bb247 [`6133d67`](https://github.com/rive-app/rive-wasm/commit/6133d67ec22e39ee96a81800ffa131d684ef32b6)
+- chore(editor): add view model uses to dependencies panel (#12948) 63b8450361 [`1f94d63`](https://github.com/rive-app/rive-wasm/commit/1f94d639695bee2f72c57194bd0150f145e8738e)
+- fix(renderer): Update dead macro names (#12933) 09c54e8737 [`5ce4873`](https://github.com/rive-app/rive-wasm/commit/5ce487317d41b27c73daa4528b8c86fc5e777a69)
+
+## [2.38.3](https://github.com/rive-app/rive-wasm/compare/2.38.2...2.38.3) - 2026-06-24
+
+### Commits
+
+- chore: tag 2.38.3 [`df35482`](https://github.com/rive-app/rive-wasm/commit/df35482bbbebefa872158c0d29dd6b1ec2a2c4d7)
+- fix(runtime): bidirectional data bind with source preference does not… (#12927) adb0834474 [`1b6d428`](https://github.com/rive-app/rive-wasm/commit/1b6d428236e8dca9663a7e92748814a2f7843c19)
+- feat(renderer): Add scissor support to more backends (#12778) 424d2323f9 [`f4e5e4c`](https://github.com/rive-app/rive-wasm/commit/f4e5e4c8f849b8ab7bba08cdb608c29e3174a01b)
+- Nnnnn focus management fixes (#12303) b2438309fa [`760e86b`](https://github.com/rive-app/rive-wasm/commit/760e86ba05ca86aca88be3c2ef5ec2dd3418efcf)
+
+## [2.38.2](https://github.com/rive-app/rive-wasm/compare/2.38.1...2.38.2) - 2026-06-22
+
+### Commits
+
+- chore: tag 2.38.2 [`73ec2f6`](https://github.com/rive-app/rive-wasm/commit/73ec2f677fecd362a125fcdf0c1da875394d4473)
+- Feat: Updates to recorder to enable thumbnail generation in prod (#12878) fcbebb25e4 [`ccb33a6`](https://github.com/rive-app/rive-wasm/commit/ccb33a6c7df4c6d3daa2944764b33b53a1632aa4)
+- fix(js): add asset Wrapper types to type definition on asset setter APIs to fix typescript mismatch error (#12883) 4296a3cd9a [`17d5123`](https://github.com/rive-app/rive-wasm/commit/17d512315bc96c50ee176bfe0a7f715d41f3b879)
+- Add ASTC and ETC2 compression modes (#12518) 0ed7a0a13d [`a4cac9b`](https://github.com/rive-app/rive-wasm/commit/a4cac9b643de8e6a364992db90e1466c1637a922)
+- Update testing_window_android_vulkan.cpp (#12898) 4bf87f97a6 [`e2d3ccd`](https://github.com/rive-app/rive-wasm/commit/e2d3ccd4d7b24ac29e73ff3a1d4ad104024ead1e)
+- Add include instead of fwd declare (#12897) c5b59b956e [`cd85846`](https://github.com/rive-app/rive-wasm/commit/cd85846f0aa7ed019e98952330159dc12687a510)
+- chore(runtime): notify property changes (#12683) 32f2243f54 [`183a278`](https://github.com/rive-app/rive-wasm/commit/183a278bd0a730b9e16bdb55c6914d80d5c2a013)
+- fix(js): bind GL context before artboard/file teardown and for offscreen renderers (#12886) 1b5c4ac067 [`0c74c03`](https://github.com/rive-app/rive-wasm/commit/0c74c0390ca1057a432403539d5f7236a51582b3)
+- feat(wgpu,webgl): Get WebGPU and WebGL deploying to a real browser (#12849) 684824c253 [`6a13820`](https://github.com/rive-app/rive-wasm/commit/6a13820b602b4fc6fcc5a3b78e0cc7e9a3d790de)
+- fix(renderer): Get an external target building again (#12884) 3a6064b95e [`01acae0`](https://github.com/rive-app/rive-wasm/commit/01acae024c3d8d4290ce0f83711fda7b2e086fc7)
+- feat: Scroll constraint drag multiplier (#12880) 2551181ab2 [`7d8c4fb`](https://github.com/rive-app/rive-wasm/commit/7d8c4fb1f3d0f02a60f9fd89475b70edefdd427f)
+- text vertical trim (#12861) a3fb919b91 [`426e219`](https://github.com/rive-app/rive-wasm/commit/426e219e988d3e9311a1acab943950dd089651fe)
+- feat(command-queue): add file asset listing via FileListener (#12662) 4a612198f1 [`317d63a`](https://github.com/rive-app/rive-wasm/commit/317d63af868e71d62f196e6d2ce399dd79035b4c)
+- fix(runtime): invalidate all scripted VM property caches on instance swap (#12863) ca0054c077 [`89a360b`](https://github.com/rive-app/rive-wasm/commit/89a360bdfb48a96d25662b548adc6590fae9c1a4)
+- fix: Snap enabled scrolling not respecting last item padding (#12856) f11274b5d9 [`e9437d9`](https://github.com/rive-app/rive-wasm/commit/e9437d9da6de8a51d82928f86ba516d0daabc529)
+- chore(editor): Generate Windows pdbs for symbolication (#12720) 2fce4282b6 [`ebd004f`](https://github.com/rive-app/rive-wasm/commit/ebd004ff3b06ea71229ed050ea5d489fd2d21fd4)
+
+## [2.38.1](https://github.com/rive-app/rive-wasm/compare/2.38.0...2.38.1) - 2026-06-12
+
+### Commits
+
+- chore: tag 2.38.1 [`f393955`](https://github.com/rive-app/rive-wasm/commit/f3939555a83fc7064b37a2a8d48a5c106a78500a)
+- fix(renderer/d3d11): guard MicroProfile GPU init against multi-context re-entry (#12766) 13fba5c3d5 [`68512c8`](https://github.com/rive-app/rive-wasm/commit/68512c8e5686deabd3df187e4d4d0fcb2b176f2c)
+- chore: Stateful Component handling of source artboard databinds (#12776) e9483b78c4 [`ab6da86`](https://github.com/rive-app/rive-wasm/commit/ab6da86b2b24e11f52d6a1a45f2a6e57ab539791)
+- fix(build): locate Visual Studio via vswhere as a fallback (#12840) c5d462f9d9 [`1f198b0`](https://github.com/rive-app/rive-wasm/commit/1f198b06ffb1e1a50288f9913455166c510f885d)
+- chore(runtime): add computed root values test (#12830) d17e462c1a [`18a6bad`](https://github.com/rive-app/rive-wasm/commit/18a6badbddccc0740f10cf76b04a4dcd13c4d73a)
+- feature: fit text content by font size (#12792) c623003932 [`801a3a1`](https://github.com/rive-app/rive-wasm/commit/801a3a18dcb84a96a3f03dffd54fd71184e1bf46)
+- fix(ore/vk): MSAA resolve corruption on Xclipse 920 (resolve targets missed the post-pass layout hand-off) (#12810) bd3b3f3b75 [`f3afe0a`](https://github.com/rive-app/rive-wasm/commit/f3afe0a236a8eeadc3bec5afcade459ccef4aa10)
+- C++ Runtime Readme revamp (#12537) c8bb275d99 [`8921806`](https://github.com/rive-app/rive-wasm/commit/892180603c43523b717b2c77e30c4d3310387f38)
+- feat(Android/Cmdq): Advance after pointer down and up (#12786) ba9b94960c [`10956bc`](https://github.com/rive-app/rive-wasm/commit/10956bc6553c561ebb56b65840f113c81b649176)
+- Fix: Bind GL context before deleting renderer on cleanup (#12770) a999606644 [`8e31737`](https://github.com/rive-app/rive-wasm/commit/8e31737e18f1924b2c5257eaecb9ffd8f6c173bb)
+- Nnnnn export bindable object with different (#12779) a680ab80e5 [`a096f8e`](https://github.com/rive-app/rive-wasm/commit/a096f8e14d7154b11817120e82f8a6d9a81a6196)
+- Add Factory::ore() and drop the redundant ore context cache in ScriptingContext (#12769) 76eeeed5d9 [`c09c363`](https://github.com/rive-app/rive-wasm/commit/c09c3631684d27a37688b5b985f7a89606cf8a03)
+
+## [2.38.0](https://github.com/rive-app/rive-wasm/compare/2.37.8...2.38.0) - 2026-06-05
+
+### Commits
+
+- chore: tag 2.38.0 [`c0f6ff4`](https://github.com/rive-app/rive-wasm/commit/c0f6ff47b4bf896c047ab3dc73b9b512415f7d0a)
+- feat(js): poll Rive focus state to conditionally drive focus back to the canvas from elsewhere in the DOM (#12713) 6169c50d9f [`5099fd7`](https://github.com/rive-app/rive-wasm/commit/5099fd75b77e125a3618fbf6a514ae708073d7b9)
+- feat(Android): Vulkan (#12653) 528ab110eb [`cda1f11`](https://github.com/rive-app/rive-wasm/commit/cda1f11f3da2598e7315231879cd556647f9ce44)
+- feat(js): advance state machine by 0 and process events/vm property changes immediately after pointerUp/Down (#12759) 9b3ff14e24 [`ffd8274`](https://github.com/rive-app/rive-wasm/commit/ffd82746c868b221312593bf728dd4d7cec31af4)
+- fix(runtime): assign view model instances to the right view models (#12756) 018a0724d9 [`be97a0d`](https://github.com/rive-app/rive-wasm/commit/be97a0dc61eefdd0a67dea5f91baf1ecd9a7d97a)
+- gl: route feathers to atlas on Mali-G52 to avoid PLS corruption (#12753) f60e429709 [`570f44f`](https://github.com/rive-app/rive-wasm/commit/570f44fce8b784cad746c27d386e1be6b959e588)
+- Bezier render prototype (#12727) 4b2501f748 [`67e3c26`](https://github.com/rive-app/rive-wasm/commit/67e3c26bc86fff097631f664fff25506a33c84d9)
+- ore: gate float render targets and baseVertex on backend features (#12712) 10e90773d5 [`72e13b7`](https://github.com/rive-app/rive-wasm/commit/72e13b7b66b748d79751318a3699d983175572a6)
+- Deferred GPUCanvas reports speculative format (#12701) 557c18ea05 [`4fd0770`](https://github.com/rive-app/rive-wasm/commit/4fd0770d618ec1179184f6b3760ecf2a7318acc1)
+- feat(editor): Expose ScrollConstraint velocity and scrollActive computed properties (#12671) d797171a0b [`aa3af83`](https://github.com/rive-app/rive-wasm/commit/aa3af83c34d06f9d4697e17657a21f20d0aa0889)
+- fix(js): prevent calling assetLoader callback for asset types not user-provided at runtime (#12684) 33025832b5 [`30208ec`](https://github.com/rive-app/rive-wasm/commit/30208ec2d70d7a44df9f396e0c96b3c7ea5742e9)
+- feature(scripting): serialize implemented methods (#12670) 8957983a44 [`f13de97`](https://github.com/rive-app/rive-wasm/commit/f13de97de5464744d27c51689aea26f7da69f374)
+- Nnnnn gamepad input support (#12646) 867dce9f73 [`09a84f9`](https://github.com/rive-app/rive-wasm/commit/09a84f971319effac62de860ddb4e94252e60929)
+- Add gpu compressed decoders (#12237) 195d4fcb25 [`5997f43`](https://github.com/rive-app/rive-wasm/commit/5997f43774a326b16dac086f2292c3c658191948)
+- feature(scripting): LuauDirectFieldGet for hot userdata reads (#12650) fe77b2ec3d [`d3a6abe`](https://github.com/rive-app/rive-wasm/commit/d3a6abe5d4a566a029c54167213c2a350966f28a)
+- fix(runtime): fix data bind container re-entries (#12649) 0649b58ff5 [`dfd3018`](https://github.com/rive-app/rive-wasm/commit/dfd301888817fa9f1d37016dd0b36c7e97a1fec5)
+- ci: move linux + windows rive_native builds to self-hosted; fetch prebuilt premake on windows (#12640) 1548d0bb39 [`c32db10`](https://github.com/rive-app/rive-wasm/commit/c32db10dc535cf4b562999a855459ff984ac8979)
+- remove lua_gc and set File reference as raw pointer (#12590) 1ff3ef872f [`f166fce`](https://github.com/rive-app/rive-wasm/commit/f166fce1e1cf728ad605b42301a86bafd2aba6cf)
+- fix(luau): GC crash in markroot from FFlag flip after lua_newstate (#12638) 6f4bc8aa47 [`0d5c5e3`](https://github.com/rive-app/rive-wasm/commit/0d5c5e3edecfd698b094f0bb89da291ed048508c)
+- chore: bump vendored luau fork to rive_0_36 (#12632) dc34cab787 [`b449621`](https://github.com/rive-app/rive-wasm/commit/b449621b279fd82cb9b590ca0f2f0b96147b657a)
+- GPUCanvas: deferred construction, beginRenderPass with view sugar, generator gets Context (#12634) 69767598c6 [`177f369`](https://github.com/rive-app/rive-wasm/commit/177f369ead9415a39b418e001af22f4da0430253)
+- chore: Add "resize" Image fit type to differentiate from "fill" (#12627) 91c4dd9b77 [`a64d3b0`](https://github.com/rive-app/rive-wasm/commit/a64d3b0c31acc631821dd185fc6fc6c246660a7f)
+
+## [2.37.8](https://github.com/rive-app/rive-wasm/compare/2.37.7...2.37.8) - 2026-05-21
+
+### Commits
+
+- chore: tag 2.37.8 [`bf02dc7`](https://github.com/rive-app/rive-wasm/commit/bf02dc7087991090388f931118670ddf9db1d360)
+- fix(unity): add missing neon palette png symbols to fix iOS crash (#12620) 463745fd0b [`bc56011`](https://github.com/rive-app/rive-wasm/commit/bc560112ab2ee7d0afd3418bd97970c2fcb36532)
+- chore(focus): expose focus polling API (#12617) fdb0536723 [`eaac76e`](https://github.com/rive-app/rive-wasm/commit/eaac76e4b7b826a520ba7cbb3331b363cd656190)
+- refactor(ore): convert ore classes to be virtual with per backend implementations (#12599) e5c20369ec [`59b7301`](https://github.com/rive-app/rive-wasm/commit/59b7301119cdd75eadb9ea4ab11d4488828de71b)
+- fix: Scroll to hidden layouts using scrollIndex (#12598) 679b808585 [`bc0cc5f`](https://github.com/rive-app/rive-wasm/commit/bc0cc5f2c2dd3b0002777939b16689f15b6e216d)
+- fix: PropertyRecorder UB calling &front() on empty buffers (#12607) 623d5fe7a3 [`745bf11`](https://github.com/rive-app/rive-wasm/commit/745bf110b2660e5ef6f435e78e4bd798b3ad30cd)
+- fix(js): restart rAF loop on document visibilitychange event to ensure we pause and resume the state machine accordingly (#12596) 1f69963ced [`5d3f1fb`](https://github.com/rive-app/rive-wasm/commit/5d3f1fbf075052ec7931c0fc72439a3fbe138c32)
+- feat(wgpu): Use wgsl (finally) in the WebGPU backend (#12541) d779307982 [`21585e3`](https://github.com/rive-app/rive-wasm/commit/21585e32366d916fb2666a4fd406e9be0f03eefa)
+- fix(runtime): Incorrect modulo in scroll using snap and carousel (#12586) 308565c15e [`cc214a0`](https://github.com/rive-app/rive-wasm/commit/cc214a0d187acf628eeb895612e31f21bb4d4ba4)
+- fix(tests): Update gms & goldens to support 16K page sizes (#12584) 4440cf2dec [`002ab0a`](https://github.com/rive-app/rive-wasm/commit/002ab0ab0936a15ad81c0ed8931bcb85ae69dfd6)
+- feat: add user-driven focus management support for js/wasm. plumb through focus manager methods to SMI (#12522) ea3739b107 [`9a17f5a`](https://github.com/rive-app/rive-wasm/commit/9a17f5a46e78a25561ef04bf888460f8b4337f2b)
+- fix(apple): retain and clear artboard/image property values in ViewModelInstance (#12561) d938779f2b [`e500205`](https://github.com/rive-app/rive-wasm/commit/e50020561860826c7158c72763b7358aa78f8879)
+- refactor(gpu): move beginRenderPass from GPUCanvas to Context (#12579) 1cac286905 [`9edf529`](https://github.com/rive-app/rive-wasm/commit/9edf529b8d97a35c23afc3b5672d8b7b5303f470)
+- fix: drop 32-bit integer vector VertexFormats (#12570) 2e4ed32ffa [`7551667`](https://github.com/rive-app/rive-wasm/commit/755166726120da9094525932681ddb84786095fc)
+- fix: pass file to data bind clone (#12569) 717b403dd9 [`d813fc0`](https://github.com/rive-app/rive-wasm/commit/d813fc042d9c3388b796bfc2070c4e9f0de19b3d)
+- fix(editor): Stateful component fixes (#12563) 26b149f92c [`895600f`](https://github.com/rive-app/rive-wasm/commit/895600f7e1ac61e6bcc3b130da5d92baa1d7df33)
+- fix(runtime): pass pointerId to drag events (#12559) 43b857965b [`1d11be1`](https://github.com/rive-app/rive-wasm/commit/1d11be184af0fcebe62b5f5b2546a9d9cab0cef2)
+
+## [2.37.7](https://github.com/rive-app/rive-wasm/compare/2.37.6...2.37.7) - 2026-05-15
+
+### Commits
+
+- chore: tag 2.37.7 [`3984a8a`](https://github.com/rive-app/rive-wasm/commit/3984a8a6bc01f35f1a9b0b61378b9c26af4d16e4)
+- fix: Make ViewModelInstanceTrigger keyable for Stateful Components (#12556) c2f1000a63 [`95048a9`](https://github.com/rive-app/rive-wasm/commit/95048a90b7fdfc37d7f5f96c718eff9893a092b8)
+- Support ktx2 (#12385) f454e3170e [`3ad1efa`](https://github.com/rive-app/rive-wasm/commit/3ad1efa01e33730d14beaf2fa82dc5cb71602050)
+- fix(js): catch errors when creating the renderer and send to Rive LoadError event (#12553) e89dcdca47 [`b313226`](https://github.com/rive-app/rive-wasm/commit/b313226fba80a178fcfcf790724c2b7605f40df2)
+- Fix render_canvas_prepass_multi GL flip pivot (#12488) db997822be [`575568e`](https://github.com/rive-app/rive-wasm/commit/575568ea021bb0751064399dd8748c36dd5c02f4)
+- chore(runtime): resolve build error after merge conflicts (#12545) 320eff3f97 [`1603626`](https://github.com/rive-app/rive-wasm/commit/1603626855f4263213031f38fe2757202765d949)
+- feat(scripting_workspace): HLSLStructLayout v2 with per-resource stageMask (#12544) a9d6eff838 [`b3c62c7`](https://github.com/rive-app/rive-wasm/commit/b3c62c74482ae599b4102a88f3084298f90f3aa3)
+- chore(rive_native): build microprofiler behind a flag (#12514) 44ba1a605e [`8a3046c`](https://github.com/rive-app/rive-wasm/commit/8a3046c7d3e629b4dc2d28c9676f9375359e1f93)
+- fix: memory pressure during dart allocations from luau trampoline cal… (#12540) 2dab5352d7 [`cce3914`](https://github.com/rive-app/rive-wasm/commit/cce3914ca18fb08e194bce828a8fa95d7f465d0d)
+- fix(scripting_workspace): HLSL export cleanup (#12512) 60b685278c [`6d75a6d`](https://github.com/rive-app/rive-wasm/commit/6d75a6d5fe3e56094f64eb47d130b20cbbfca60d)
+- chore: Guard from calling markNeedsUpdate in update (#12525) fab85a4fd5 [`ea0ff90`](https://github.com/rive-app/rive-wasm/commit/ea0ff90ccdac691ae29ee8e87055319a52fa5905)
+- fix(editor): reset scripted objects initialization when data context is cleared (#12523) 9faec1e36e [`4d5c72c`](https://github.com/rive-app/rive-wasm/commit/4d5c72cb564028a5b4629aa9deb72e847557a1c7)
+- validate inputs for logging (#12521) 8e58f305c1 [`9d804e3`](https://github.com/rive-app/rive-wasm/commit/9d804e36956a094d7b2c0a45d9a3a5e617a49144)
+- Update profiler to fix build (#12515) 687a80a7a8 [`87f8275`](https://github.com/rive-app/rive-wasm/commit/87f8275e24941f9ee0b9bd85c4ccb06149cde318)
+- chore(js): force js/npm/** changes through downstream push with up-to-date versions. add rive_fallback.wasm to webgl2 package files to actually publish with that file (#12502) d3ee0f9e01 [`a64cc66`](https://github.com/rive-app/rive-wasm/commit/a64cc66caf6a050e5d8961345f918e7953cf7f0a)
+- Nnnnn scripted interpolators (#12505) 44b83c5345 [`310b1b8`](https://github.com/rive-app/rive-wasm/commit/310b1b84d34194cc5a07a771fcd9edb1406bdb59)
+- chore(editor): Move stateful toggle to NestedArtboard (#12490) 9f0dc79e3f [`3ad6d1f`](https://github.com/rive-app/rive-wasm/commit/3ad6d1f230666606b02c9f1796755349d2d70e33)
+- refactor(runtime): added overload for decoding shader (#12492) f1c2f2c776 [`1315a1d`](https://github.com/rive-app/rive-wasm/commit/1315a1dc73a1a720c61c12f58ea19ab9e7754c49)
+- chore: drop multi-shader machinery, drop legacy ScriptAsset-RSTB fallback (#12485) f74ec7dfd5 [`c1632cf`](https://github.com/rive-app/rive-wasm/commit/c1632cf0a2f290ac41886ce8dc497f6de46eb77c)
+- chore(shaders): call draw canvases from the draw command and gate met… (#12489) afccc14a00 [`e85a10a`](https://github.com/rive-app/rive-wasm/commit/e85a10af8a0423aacae5e1304f09b278ff020166)
+- added internal asset loader so you can bypass cmdq (#12487) a53f08a914 [`ea4e75c`](https://github.com/rive-app/rive-wasm/commit/ea4e75cfefc4d8d0dddfba47a0273b8a3f18d84c)
+- chore: delay running data binds until necessary (#12469) ee223deb96 [`0439aba`](https://github.com/rive-app/rive-wasm/commit/0439aba0b78211892c5d15c43975865ce23bb1dd)
+- Move from .rtex to .ktx2 (#12369) db268e8c81 [`13064a2`](https://github.com/rive-app/rive-wasm/commit/13064a23d01d586d7399230581a5329b68062ad9)
+
+## [2.37.6](https://github.com/rive-app/rive-wasm/compare/2.37.5...2.37.6) - 2026-05-08
+
+### Commits
+
+- chore: tag 2.37.6 [`219bd99`](https://github.com/rive-app/rive-wasm/commit/219bd9938ccad6b08c400ff55bc4f6da43e4c138)
+- Fix/render bc7 images (#12344) 3b74a52148 [`2833de3`](https://github.com/rive-app/rive-wasm/commit/2833de372c0d22596494c89c328008ce5b1106d7)
+- fix(browserstack): Fix the browserstack run for vk gms (#12473) b70b191146 [`1a46ed8`](https://github.com/rive-app/rive-wasm/commit/1a46ed8267c629fbe0009a4834740027a7d116ae)
+- fix(glmsaa): Fix MSAA artifacts with dstBlend barriers and no KHR (#12413) 82af6951bf [`f59f28b`](https://github.com/rive-app/rive-wasm/commit/f59f28b84aba5013a6eb3e5bcb6ceb8eda0d6268)
+- chore: drop D3D11/D3D12 pre-compiled DXBC ingestion path (#12475) 1de58d297c [`381df50`](https://github.com/rive-app/rive-wasm/commit/381df504bfc847c1db7c9475e74a0944745975b2)
+- feature: track ShaderAsset assetId on ShaderModule (TRACK_RIVE_SHADER_ID) (#12474) d2e31a1f65 [`dcb1ecb`](https://github.com/rive-app/rive-wasm/commit/dcb1ecb3598bc0bb93eff1d4217702df45a67583)
+- chore(runtime): improve initialization performance of clipping shapes… (#12472) 666dc5691e [`7ae4825`](https://github.com/rive-app/rive-wasm/commit/7ae4825d986b51524fe9584ddde1547613f66a1f)
+- fix(tests): gate render_canvas GMs behind with_rive_canvas (#12441) 1aab0beb60 [`4c3a7c8`](https://github.com/rive-app/rive-wasm/commit/4c3a7c8679b569142fd49d34022403ae7e9f2cd7)
+- fix: Absolute layout fill behavior (#12471) 6cce514679 [`3e32f3f`](https://github.com/rive-app/rive-wasm/commit/3e32f3f684667a1fb9026911b2d26d6c9df68d6b)
+- fix(runtime): Fix top level artboard hug behavior (#12462) 0e91142f40 [`775e004`](https://github.com/rive-app/rive-wasm/commit/775e004d01360d2db0d202014f03a48359d28a7d)
+- fixes(editor and runtime): follow path and editor reload (#12461) ed48c0a53d [`8ea2397`](https://github.com/rive-app/rive-wasm/commit/8ea2397fba8034443b4d1c2394406bd97ecc1a13)
+- fix(js): ensure onLoadError is invoked for any part of the initialization process (#12394) ebd828108a [`1eaaced`](https://github.com/rive-app/rive-wasm/commit/1eaaced2dc831878d70f9a4afca13c0aa6edded4)
+- fix(tests): make Rand produce identical sequences across platforms (#12432) 9a8f7e7a19 [`817fdbb`](https://github.com/rive-app/rive-wasm/commit/817fdbb44a63b86aac6e7c1318db541bf224124c)
+- feat(scripting): Mat4 affine fast paths + reverse-Z perspective (#12454) 072832aecc [`889f9fb`](https://github.com/rive-app/rive-wasm/commit/889f9fb82857b83d77e57b7b4cc8ea9d6606f9e5)
+- feat(Command Queue): Add draw key cancellation (#12451) 7c539a46ff [`7dcec81`](https://github.com/rive-app/rive-wasm/commit/7dcec81cdc2a47d19be9470d6ab6ac63a7a0912e)
+- track state machine state for profiler (#12434) 565f8ad739 [`5d8b0fe`](https://github.com/rive-app/rive-wasm/commit/5d8b0fe4d5a0f6aca5a9208603b011c1a1a4ee44)
+- feat(scripting): first-class Mat4 type with SIMD multiply (#12445) a076a8abde [`db0eb6c`](https://github.com/rive-app/rive-wasm/commit/db0eb6c6e2f7a404810964c482c45762ba084b00)
+- chore: Add more Stateful Component tests (#12438) 13be041786 [`b5b04d3`](https://github.com/rive-app/rive-wasm/commit/b5b04d3574d8bd2ecd446b3616268925718b31ee)
+- Split Ore Context into per-backend subclasses (#12442) ee268b5467 [`26f62a9`](https://github.com/rive-app/rive-wasm/commit/26f62a930af8c6ea224f3eeb5c048a166d1ef627)
+- refactor(unreal): main branch compatability (#12440) 66dbcd05f3 [`d8a5b83`](https://github.com/rive-app/rive-wasm/commit/d8a5b83814ca69667b93c66ba9fe5e48ad23f5cc)
+- Add code for tier levels on profiler (#12411) 0a621bb320 [`576069d`](https://github.com/rive-app/rive-wasm/commit/576069d22336777962f49ac4a1a95d3a952461b7)
+- fix(vulkan): Resolve driver crash on some mobile GPUs (#12403) 1deebb93aa [`9d47a27`](https://github.com/rive-app/rive-wasm/commit/9d47a27dc958d7d0173150a5c02f480be88b2cbe)
+- fix: make `SimpleArray` constructor overflow safe(r) (#12313) ea38312ee1 [`5adb712`](https://github.com/rive-app/rive-wasm/commit/5adb712b2e7e92608575a995381a5dc0dc2b61be)
+- Expose context:preferredCanvasFormat() to Dart-hosted scripts (#12419) 852622182f [`273da87`](https://github.com/rive-app/rive-wasm/commit/273da87dbf9265cdd54bc20d41a0a48c04a897a6)
+- chore: Stateful component input/output display name (#12406) 1c0be407fa [`0d8993e`](https://github.com/rive-app/rive-wasm/commit/0d8993eae8cb9bc0068f6b9592ca3fdadd3128ef)
+- fix(ore): depth only pipeline (#12408) a2f90edf62 [`815c0f4`](https://github.com/rive-app/rive-wasm/commit/815c0f4b3af33d8963701eab9ec5ddb318a07621)
+- feat(ore): 3D (#12319) 462e0574ec [`c9a1f12`](https://github.com/rive-app/rive-wasm/commit/c9a1f1233d209cc5efc62a95fe6c30fe369d64b7)
+- fix(d3d12): sampler heap rotation must re-create immutable samplers & initialize unused SRV  (#12399) 27bd52389b [`9612c65`](https://github.com/rive-app/rive-wasm/commit/9612c6536d2fe40325ec52f10604b859fe1ffdc3)
+- feature(scripting): expose view model image properties (#12390) 48d4b69f15 [`de7f580`](https://github.com/rive-app/rive-wasm/commit/de7f580b59dd34767f6b340b86c1322533315beb)
+- Enumerate Compressed texture formats (#12358) 5e9fc9910b [`080455a`](https://github.com/rive-app/rive-wasm/commit/080455abe602e35c4fdaaff3277ad525e83046ab)
+- fix(d3d12): image samplers must use default-mode filter, not comparison (#12395) cdfb9acc06 [`d0c1286`](https://github.com/rive-app/rive-wasm/commit/d0c128645da1d7523c07251f88c84db75a724b25)
+- fix(cmdq) fix race condition (#12392) 3698608ea4 [`bb0a661`](https://github.com/rive-app/rive-wasm/commit/bb0a661c8378d26fb59aea2b2be3a48c48245ce9)
+- Nnnnn scripted properties lifecycle (#12375) 1df363d3b8 [`fd4761f`](https://github.com/rive-app/rive-wasm/commit/fd4761fd82a2f3cda749d00da7fd4932ec991a0a)
+- fix: Layout ScaleType keying with percent units bug (#12388) 1f4b65d3dd [`b21dfb2`](https://github.com/rive-app/rive-wasm/commit/b21dfb24c7aa27e3fa572f1729afd6839bcc8b8a)
+- fix(d3d12): rebind invalidated root descriptor tables after sampler heap rotation (#12387) 9354e62e9a [`aeea3b2`](https://github.com/rive-app/rive-wasm/commit/aeea3b295cf01aca7c8e02afc4fa553f6811ac10)
+- feat(ui update): data value toggle [flagged] (#12357) c8af6cfdcc [`206f1aa`](https://github.com/rive-app/rive-wasm/commit/206f1aa2c7b759af124617f5d73a27bbcec8c7c0)
+- chore: Rebaseline silvers (#12379) a3dd13b312 [`35dc420`](https://github.com/rive-app/rive-wasm/commit/35dc4207affd7ce8c77672717baebd122e2bd303)
+- chore: validate size of lists before iterating (#12365) 1a5100efcf [`391862d`](https://github.com/rive-app/rive-wasm/commit/391862de25c23275c2ee0c3495957b99555a24c9)
+- fix(renderer): Only apply barriers on drawGoup boundaries (#12347) 31aa875e47 [`3eba7f0`](https://github.com/rive-app/rive-wasm/commit/3eba7f0efb25f0b96df52c15780a4e2b6ccc425d)
+- feat(cmdq): sync mouse events (#12322) d2cf8f885b [`5b5a3e5`](https://github.com/rive-app/rive-wasm/commit/5b5a3e5d38f1ff772bc83492f8d4d5a4d9573ba1)
+- Fix Runtime Compressed texture loading (#12338) 5e1daebe83 [`960167f`](https://github.com/rive-app/rive-wasm/commit/960167f4d7a0620c857fd47b02337f80ad9db4aa)
+- feature(scripting): expose access to list index property (#12286) 1b04939b52 [`6f90515`](https://github.com/rive-app/rive-wasm/commit/6f90515b650d4c8034986d1bbc69d23b8ca2a96c)
+- feature - RSTB edit-time generation (#12341) 25e5123be4 [`0334eaa`](https://github.com/rive-app/rive-wasm/commit/0334eaa5bf3e455773cb79326ca6350a51422b50)
+- feature(focus): add support for focus traversal actions (#12327) eb578eb9f6 [`097073a`](https://github.com/rive-app/rive-wasm/commit/097073a8785ad63bff78e91f0728752221ce7a81)
+
+## [2.37.5](https://github.com/rive-app/rive-wasm/compare/2.37.4...2.37.5) - 2026-04-28
+
+### Commits
+
+- chore: tag 2.37.5 [`3f4ebae`](https://github.com/rive-app/rive-wasm/commit/3f4ebaee781dc79d15957d70895a164f9e3485f7)
+- fix(scripting): clear scripted view model cache when instance changes (#12325) bc28f6b706 [`e04b021`](https://github.com/rive-app/rive-wasm/commit/e04b0216bb5bd02734ade4d8af77dd2e76ea6ef1)
+- chore(renderer): pre-Ore PLS misc fixes (#12324) 53d9569d3e [`8ded17a`](https://github.com/rive-app/rive-wasm/commit/8ded17a8f8184ada997dd7d1fba657d953e7f782)
+- Runtime compressed texture support (#12026) 7009e7fdec [`ed02349`](https://github.com/rive-app/rive-wasm/commit/ed0234969cd0a996fe41e9afbf0aa67880af118a)
+- fix(d3d12): three spec-compliance fixes uncovered by stricter D3D12 validation (#12316) 68e0e5ef0d [`e928c93`](https://github.com/rive-app/rive-wasm/commit/e928c930f404e32e6214e8a79d4041d7cc6723cd)
+- feat(runtime): added clear list command (#12301) fe2c92535c [`314d6a9`](https://github.com/rive-app/rive-wasm/commit/314d6a995f6943e8ccb38b9505866132409f6e09)
+
+## [2.37.4](https://github.com/rive-app/rive-wasm/compare/2.37.3...2.37.4) - 2026-04-24
+
+### Commits
+
+- chore: tag 2.37.4 [`e586055`](https://github.com/rive-app/rive-wasm/commit/e586055527909602aa92d94a6dace1078b7ef7a4)
+- chore: Add additional nullptr checks in ArtboardComponentList (#12292) 87fbb1cdff [`5581955`](https://github.com/rive-app/rive-wasm/commit/5581955bf70d8976c60254de1a9c50c128e70582)
+- refactor(semantic): simplify SemanticManager refresh() bounds and ordering (#12282) d5bd1a0bd8 [`23bd88f`](https://github.com/rive-app/rive-wasm/commit/23bd88f3fd1d92a05938ec45ec40f5020ebf7523)
+- Nnnnn focus management fixes (#12290) 12495d656d [`0c2704b`](https://github.com/rive-app/rive-wasm/commit/0c2704be80ec1a01c8aa7859483ca1f977195ce6)
+- feature: add support for data binding solos to enums (#12009) ab78bca1e5 [`0c2de4f`](https://github.com/rive-app/rive-wasm/commit/0c2de4f332896bf0eeabccacc500841ac2402df3)
+- fix: do not default artboard value to 0 to avoid initializing to wron… (#12007) d722a63bb8 [`c88bd38`](https://github.com/rive-app/rive-wasm/commit/c88bd38492a38346f831f23190a8a05d5ae1cb16)
+- feat: accessibility semantics (#11896) 30ace69c91 [`f577ced`](https://github.com/rive-app/rive-wasm/commit/f577ced09699fdca5403245277fae3f21941a1f7)
+- chore: ensure stateful components are bound (#12241) c352234f45 [`c6f4052`](https://github.com/rive-app/rive-wasm/commit/c6f4052672af7a78ae51adacf047607b588d7fad)
+- Texture compression cli tool (#12115) 77f2cf82a4 [`6e0b29f`](https://github.com/rive-app/rive-wasm/commit/6e0b29f9233a90cc28d986ccef6591b8c9cd1681)
+- fix: ListenerAction import and stateful ArtboardHost calls advanced() (#12238) 4ce0cedebd [`f94d6b2`](https://github.com/rive-app/rive-wasm/commit/f94d6b2120936ba4715618a754640eefb0dc5540)
+- feature: add support for draw index on artboard component lists (#12234) d83826e10b [`f8083bd`](https://github.com/rive-app/rive-wasm/commit/f8083bdb3aa2430b69c517c0c8f3fd2e5e5563ea)
+- fix(unity): add missing libpng symbol renames for Unity 6.4+ WebGL builds (#12236) 4744c8972a [`b593e79`](https://github.com/rive-app/rive-wasm/commit/b593e79f74b67b6673e826bd09ebd1e6296707a6)
+
+## [2.37.3](https://github.com/rive-app/rive-wasm/compare/2.37.2...2.37.3) - 2026-04-20
+
+### Commits
+
+- chore: tag 2.37.3 [`f527948`](https://github.com/rive-app/rive-wasm/commit/f5279481b4463e0de110ac1f7076414e1723031b)
+- fix: for single-touch mode, track the primary fingers movements only (#12227) 7b89ab2a1c [`2168ba4`](https://github.com/rive-app/rive-wasm/commit/2168ba443ccd66ddd76263964094f959e4ea68cc)
+- fix(runtime): leak in ElasticScrollPhysics helpers (#12226) f6fa7f21cf [`a5c64ae`](https://github.com/rive-app/rive-wasm/commit/a5c64ae3d54d4b290d44e079dee7fc80245642e7)
+- feat: TextInput Tool Improvements (#12221) 5bd28c734a [`595e26b`](https://github.com/rive-app/rive-wasm/commit/595e26bcf757bac13d9f2d8713e9f9259bb8e56b)
+- feat(renderer): Implement clip for clockwiseAtomic (#12120) da326b3fca [`f1cedb7`](https://github.com/rive-app/rive-wasm/commit/f1cedb7bc5b0ac2a7195154e1aa8fb91366c726b)
+- feat(cq): add success callbacks for instantiations (#12213) e5ce0c3387 [`1f3600a`](https://github.com/rive-app/rive-wasm/commit/1f3600ab618e0dcfe42d7d7cd780a68aed64a13d)
+- fix: null-terminate char-array shaders in MSVC mode (#12218) 6d3708536a [`ecce5e0`](https://github.com/rive-app/rive-wasm/commit/ecce5e0df6736ee94efe9eb30efc47837a3f59bc)
+- feature: add support for triggering actions on state transitions and … (#12209) 235ca76b31 [`28b4b35`](https://github.com/rive-app/rive-wasm/commit/28b4b354b2760237b9632504b9ec6d2f42012bc6)
+- fix(Android): Fix linking issues on ARMv7 devices due to TLS relocations (#12175) a921b11eb8 [`ff394fc`](https://github.com/rive-app/rive-wasm/commit/ff394fc13b92978772276d2c2249bddfb191d717)
+
+## [2.37.2](https://github.com/rive-app/rive-wasm/compare/2.37.1...2.37.2) - 2026-04-17
+
+### Commits
+
+- chore: tag 2.37.2 [`68ce5df`](https://github.com/rive-app/rive-wasm/commit/68ce5df3496f3c05fc681fc2db9c959e144a4527)
+- chore(runtime): Remove tess renderer (#12207) 862f1ff44c [`01452a0`](https://github.com/rive-app/rive-wasm/commit/01452a05ce0e218bfaff7eaf635c4122f8135c55)
+- feature(scripting): add support for remove and removeAt (#12201) 0015c1d29e [`bf05e29`](https://github.com/rive-app/rive-wasm/commit/bf05e294ed704cda9d615884d277e447acba4c1e)
+- fix(editor): track orphan ScriptedProperty on ScriptingContext (WITH_… (#12195) 0475399dc5 [`666c6ae`](https://github.com/rive-app/rive-wasm/commit/666c6aeab958b8bdc075713fcf10aceda6d92b05)
+- fix(webgl): Update to latest PLS api (#12192) c8d7c868ca [`0790445`](https://github.com/rive-app/rive-wasm/commit/07904450bb726399e36342197edbf4e37f4b02df)
+- fix: include BlobAsset in File::read() asset import switches (#12191) a8142e0e4f [`62a9d33`](https://github.com/rive-app/rive-wasm/commit/62a9d335f85032fe0cccf137a954123f126ab16b)
+- fix: create new render path if a path is used multiple times in the s… (#12182) 85a72f0ffd [`8bd63e7`](https://github.com/rive-app/rive-wasm/commit/8bd63e71e5cb614cc802150f410d4c1902c6cf2e)
+- fix(wgpu): honor offscreen render target in testing_window_wgpu (#12174) f129648151 [`525208f`](https://github.com/rive-app/rive-wasm/commit/525208fdbadb6c5db07457902deade29e607e6b9)
+- Handle linebreaks in single/multiline TextInput (#12154) dab97cd7b1 [`74b0c10`](https://github.com/rive-app/rive-wasm/commit/74b0c10f0eb7f843bfe2eab188ea47a0da96a1d4)
+- Feat: Rive Renderer in Recorder (#12113) 7adf1e50c8 [`5969740`](https://github.com/rive-app/rive-wasm/commit/5969740cb552d0fd66cc2808e36945b0d38b83f4)
+- fix(editor): Fix Viewmodel duplicate naming & databind preview toggle stuck after undo (#12132) 223c4c3721 [`6f85294`](https://github.com/rive-app/rive-wasm/commit/6f852944c7fc9201738509e0f22d0fd2e005897c)
+- fix(runtime): advance view models from bindable artboards (#12135) f1f9769606 [`f940a9d`](https://github.com/rive-app/rive-wasm/commit/f940a9da1aa7f2aa334a49e2e5b75b385d67ffb7)
+- fix: look for view model properties by name and type (#12133) 51992ddcda [`c7e6a2b`](https://github.com/rive-app/rive-wasm/commit/c7e6a2b64caa88e42ddc550ee1373a8e12739318)
+- fix(Vulkan): Fix saturation blend mode on some devices (#12111) b6b80d795a [`801945d`](https://github.com/rive-app/rive-wasm/commit/801945dffb1dcbc6c5b5567ad91b9aebdfe4f868)
+- feat: Single/multiline support in TextInput and improved scrolling (#12127) 74f49dd1be [`83596a1`](https://github.com/rive-app/rive-wasm/commit/83596a1dc81d9ac6f582067eb0b1fdabe096a118)
+- Get the downstream rive-runtime Linux tests passing (#12121) 1902f9ddf3 [`deefb22`](https://github.com/rive-app/rive-wasm/commit/deefb22e7377fd536418484ac2dba4b129eaa176)
+- chore(testing_window): Default shader compilation mode changes (#12119) 49e0b94a5f [`4a2509b`](https://github.com/rive-app/rive-wasm/commit/4a2509b6ec7025a6b80432789be82e1ca3f38fb2)
+- refactor(tests): Refactored deploy_tests to use the same file instead of one per console (#12116) 478898e6b4 [`0fb07fe`](https://github.com/rive-app/rive-wasm/commit/0fb07fe3dc635e4fe6c821c92ba77de18d2f8534)
+- feature: add support for component based conditions (#12059) 5483819400 [`d167d80`](https://github.com/rive-app/rive-wasm/commit/d167d80cf92313e36062e8418da56ef931b89ca5)
+
+## [2.37.1](https://github.com/rive-app/rive-wasm/compare/2.37.0...2.37.1) - 2026-04-09
+
+### Commits
+
+- chore: tag 2.37.1 [`fae9cc6`](https://github.com/rive-app/rive-wasm/commit/fae9cc6b42ee8a63a43b496f157dbce271aef5b6)
+- chore(unit_tests): Get inline shaders compiling in MSVC (#12100) d3d433b8b3 [`f6a20c7`](https://github.com/rive-app/rive-wasm/commit/f6a20c7a5cbdd00257cd147ab5be73f87c2388ac)
+- docs: update JS readme (#12088) 3f39f0349a [`34f012c`](https://github.com/rive-app/rive-wasm/commit/34f012c8ec92854eb71f6ff99d1931eea5a64203)
+- fix: add bash-native VS dev environment setup for Windows (#12094) d302b78b45 [`3bdc154`](https://github.com/rive-app/rive-wasm/commit/3bdc154667fb9aa8b2d591657e06447c0724989a)
+- fix(editor): Store ScriptedContext on ScriptedObject for disposal (#12070) cb54233310 [`0f24983`](https://github.com/rive-app/rive-wasm/commit/0f24983c51380e3af5b8a7a7ee1e6cb64578e01d)
+- fix(runtime): when an interpolation duration is set to zero, reset th… (#12086) 3afc336770 [`9d2b8ad`](https://github.com/rive-app/rive-wasm/commit/9d2b8adac64793c363ad5296f07413ff17c86b41)
+- fix: add new types to be released in high-level runtimes too for package.jsons [`daf94c2`](https://github.com/rive-app/rive-wasm/commit/daf94c2d113b8cb119eff81a312122275deea5fd)
+- fix: remove the old webgl package variants [`bb11211`](https://github.com/rive-app/rive-wasm/commit/bb112114b9e0df2e67c08b6b99eb971a21d56476)
+- feat: Image Fit & Alignment when parented by Layout (#12057) ca2ce7d096 [`cc8ecee`](https://github.com/rive-app/rive-wasm/commit/cc8ecee15e09a48d6910bb97196a32c1794757bd)
+- chore(runtime): Enum bitset refactor and new enum util functions (#12038) 19c486654a [`3ed9240`](https://github.com/rive-app/rive-wasm/commit/3ed924099368e592b1f78fc6ccd4a069c5451cdd)
+- chore(glsl): Rename PLS_*_ATOMIC to PLS_*_UAV (#12056) 2390433e6b [`7db0a6b`](https://github.com/rive-app/rive-wasm/commit/7db0a6b42de4d4ae55198047d7d6ae7c43e36d2b)
+- chore(runtime): Remove duplicate degreesFromRadians function (#12054) 44a307ef2e [`2d4266b`](https://github.com/rive-app/rive-wasm/commit/2d4266b37750a8e51242f34c921c58930639c9ea)
+- fix(runtime): memory leak with listeners on scripted view model prope… (#12047) 3201f83d97 [`bcbb7c5`](https://github.com/rive-app/rive-wasm/commit/bcbb7c5c388d67acfceee1783f3a245af1c86393)
+
+## [2.37.0](https://github.com/rive-app/rive-wasm/compare/2.36.0...2.37.0) - 2026-04-03
+
+### Commits
+
+- chore: tag 2.37.0 [`20f3572`](https://github.com/rive-app/rive-wasm/commit/20f3572332a8bafdfb7fc4f7d424c59c6d68b27a)
+- chore: add duration to audio API (#12040) a3c233b32a [`0cb3674`](https://github.com/rive-app/rive-wasm/commit/0cb367476723933ab4821625568a608ea1645e4f)
+- feat(vulkan): Add ability to pre-build draw pipelines (#11945) 15be2c7178 [`d988ab7`](https://github.com/rive-app/rive-wasm/commit/d988ab73372306485c53ff66ce05535508730885)
+- Bind stateful component VM instances with provided instances (#11999) 46c241d197 [`0f712bf`](https://github.com/rive-app/rive-wasm/commit/0f712bfc0da5683395ac898a078be49c09a97b44)
+- feature: provide text and keyboard inputs to drawable scripts (#12002) b76bd385af [`75b195a`](https://github.com/rive-app/rive-wasm/commit/75b195a4c446acccb78a098da67d0e1a0264c05d)
+- test(gl): Reset atlas type back to r16f after changing it for testing (#12000) a5ba42dab9 [`fbb040f`](https://github.com/rive-app/rive-wasm/commit/fbb040f3cdd812992460079180de1431d465aa91)
+- Stateful component fixes (#11982) a10b1aecc6 [`08f4c10`](https://github.com/rive-app/rive-wasm/commit/08f4c10abad4caa813ee111a276ed4595151857f)
+- Nnnnn state machine key input listeners part 4 (#11979) cf9c8526a5 [`1cb858e`](https://github.com/rive-app/rive-wasm/commit/1cb858e8d12b6a2a3fd28680af91fa167de85bf9)
+- fix(renderer) gamma correction fix (#11949) 5513f3f042 [`46e69fe`](https://github.com/rive-app/rive-wasm/commit/46e69fe01aae5f114bccf171ec526e517a9d4d72)
+
+## [2.36.0](https://github.com/rive-app/rive-wasm/compare/2.35.4...2.36.0) - 2026-03-27
+
+### Commits
+
+- chore: tag 2.36.0 [`d376e7d`](https://github.com/rive-app/rive-wasm/commit/d376e7dbcef2a7672c78a77c00b7cda4c2d5b263)
+- feat: expose view model name from view model instance as a property on viewmodel_runtime_instance (#11944) 85c89c739c [`824640c`](https://github.com/rive-app/rive-wasm/commit/824640c58fbaf8d99f1c77a15d35386aa71db730)
+- fix(editor/runtime): Honor path effect shape for inner vector feathering (#11971) 263c8a422d [`73ceb3a`](https://github.com/rive-app/rive-wasm/commit/73ceb3a83e77bd48af0b2df02c6428710673a15e)
+- Disable broken tests for now. (#11959) 31ff9f971a [`209a406`](https://github.com/rive-app/rive-wasm/commit/209a4069da3fed982b24bda4abc793d8dfc40d86)
+- Nnnnn state machine key input listeners part 3 (#11952) a77fcaadfe [`9d1fbd5`](https://github.com/rive-app/rive-wasm/commit/9d1fbd5eca050647aebe66ae507a10f83c42c2e6)
+- chore: Use structured Github Issue forms across runtimes (#11828) 50b70f682a [`0929c2d`](https://github.com/rive-app/rive-wasm/commit/0929c2d56c63d84f4be7ca58b3fe38ff56abbb4d)
+- fix(runtime): Databind State machine transition duration (#11947) 98ac9c07a3 [`5b4cc06`](https://github.com/rive-app/rive-wasm/commit/5b4cc064fe33a625169727fc5de60a4d90ce6424)
+- fix(runtime): Add nullptr check for ConditionComparison during transition (#11955) fc1c3488ec [`8cfc88d`](https://github.com/rive-app/rive-wasm/commit/8cfc88d849968a5e7784a09dd005464ff98a8357)
+- fix build: looks like a `rivestd` got left behind by a merge (#11953) 5069323843 [`31b98f0`](https://github.com/rive-app/rive-wasm/commit/31b98f04242fc28c387297fdb4ced7ca1bfefbea)
+- fix(unity): add symbol renames to prevent HarfBuzz collisions with Unity (#11951) c17d930238 [`80d0c38`](https://github.com/rive-app/rive-wasm/commit/80d0c38f95c56ecec6f9089f7364198011d177fd)
+- Nnnnn state machine key input listeners part 2 (#11936) 8a82cf2e25 [`b6d599f`](https://github.com/rive-app/rive-wasm/commit/b6d599f49ce0279ab9e7b23bb9ebc39540dc1616)
+- chore: Bump core runtime to C++17 (#11946) 235eba5b6b [`5890692`](https://github.com/rive-app/rive-wasm/commit/5890692aab891212e41d02fdc1df7f234242df08)
+- feat: optimize wasm and js build script and add some features to profile Rive (#11921) da1ef24f0f [`8956c9c`](https://github.com/rive-app/rive-wasm/commit/8956c9cc4f270954f717cb9d2b7cecd76bd4aee1)
+- fix(runtime): store relinked view model instance on nested artboard (#11931) 76c7232fa1 [`5e2a4c4`](https://github.com/rive-app/rive-wasm/commit/5e2a4c4d8ac95f62ee5c379bde0ca622e0d6a6fd)
+- feature: add support for sending keyboard inputs to focused elements (#11924) 19486d13d0 [`13d4d29`](https://github.com/rive-app/rive-wasm/commit/13d4d2965e9afe416c1472ffcc44c177ad16c62e)
+
+## [2.35.4](https://github.com/rive-app/rive-wasm/compare/2.35.3...2.35.4) - 2026-03-23
+
+### Commits
+
+- chore: tag 2.35.4 [`b38a584`](https://github.com/rive-app/rive-wasm/commit/b38a58405f76735bdf0856cb32ccc70efb091e2b)
+- fix: Fixes occasional mesh crash on each draw with different technique to grab uv, vtx, indices from WASM heap (#11911) 6033a9a49b [`5c70f18`](https://github.com/rive-app/rive-wasm/commit/5c70f18651a6c32a4b3dc94a70bb00356c6825c9)
+- Add support for setting ViewModel value using Listeners and comparing ViewModels in Transition Conditions (#11917) 46a089fc12 [`bee1d1a`](https://github.com/rive-app/rive-wasm/commit/bee1d1a692f06e434ea4ef8d5197e622ca332a21)
+- chore: skip focus nodes that are collapsed or fully transparent (#11916) 57139fa664 [`51b0c5b`](https://github.com/rive-app/rive-wasm/commit/51b0c5b0803ed8b6ab48345b5727f6e42897c5e9)
+- fix: type enum issue with vm property DataType. re-expose the enum for runtime use (#11915) c07d10f899 [`a82466e`](https://github.com/rive-app/rive-wasm/commit/a82466e98ef8eb41817d43ff46453554a049268c)
+- Nnnnn library export fixes (#11884) 68176685ac [`89e956e`](https://github.com/rive-app/rive-wasm/commit/89e956edc1ab67ba62058fa281de8094fe7ccf4e)
+- feat(vkcwa): Implement advanced blend (#11858) 37c39e85d4 [`327710e`](https://github.com/rive-app/rive-wasm/commit/327710e3b942f52f84e2ffa3a8bced82f972cf94)
+- Bind ViewModelInstanceList with Stateful Components (#11878) e4abf64f44 [`3b38385`](https://github.com/rive-app/rive-wasm/commit/3b38385d35efbf49349f01448d62c5e47f8e8857)
+- fix: correct emoji image buffer size and dual-presentation fallback (#11876) 7640c5a47a [`f8e57de`](https://github.com/rive-app/rive-wasm/commit/f8e57de6078fd42c72eb1c7f34afa7be4a8c54eb)
+- feature: add support for removing all elements from a view model list (#11872) 354acb8533 [`0a1c9a6`](https://github.com/rive-app/rive-wasm/commit/0a1c9a69217043ac0066ffd4fa41165c8cbad174)
+
+## [2.35.3](https://github.com/rive-app/rive-wasm/compare/2.35.2...2.35.3) - 2026-03-16
+
+### Commits
+
+- chore: tag 2.35.3 [`51315fd`](https://github.com/rive-app/rive-wasm/commit/51315fd8f8f35100276258ac7e757dfd331b1a66)
+- feature: add support for multiple inputs on listeners (#11862) 501b7f488c [`4cd4607`](https://github.com/rive-app/rive-wasm/commit/4cd4607f079503933f43040222470d81e33948dc)
+- feature: emojis! (#11857) 89305a5fed [`93f2356`](https://github.com/rive-app/rive-wasm/commit/93f23564dcb913cef883175a792082fb177391cd)
+- fix(runtime): Don't early out when processing KeyedObjects with missing objects (#11856) 3eb4211852 [`d25b756`](https://github.com/rive-app/rive-wasm/commit/d25b7563feacd3c9f7c70c257516ca8223421bf0)
+- Component Input/Output Properties (#11854) 3034940065 [`50d11aa`](https://github.com/rive-app/rive-wasm/commit/50d11aaa23b92e6f5a7eeda3fa8274f713ab440f)
+- fix(apple): support language hints, create font from tables (#11807) 30fcb84a44 [`e1266c4`](https://github.com/rive-app/rive-wasm/commit/e1266c4b5cbc370095afc74426289bec5c9b59c2)
+- feat(renderer): Enable reordering on clockwise mode (#11843) b5b724b93a [`ecdee3a`](https://github.com/rive-app/rive-wasm/commit/ecdee3a2d703d372abdc5e9c409c1c2d139715c9)
+- Stateful Component Properties (#11800) b09cb6b29e [`52b8003`](https://github.com/rive-app/rive-wasm/commit/52b8003100c241118818514a5aae50d99997ea66)
+- feature: add support for replacing view model property values (#11826) c8242bfa23 [`f8101f8`](https://github.com/rive-app/rive-wasm/commit/f8101f82b6a6210b01202be9c498519873909f0c)
+- fix: missing psql install (#11838) 96919e93b7 [`34f2043`](https://github.com/rive-app/rive-wasm/commit/34f2043487beca75d3d539da4c2073405a01d8b7)
+- chore: bump to luau 0.711 (#11837) e74f1cb12e [`a9a5690`](https://github.com/rive-app/rive-wasm/commit/a9a56903d439ea5512f5fb9ead86a865d0cb7493)
+- feature: RenderCanvas, a GPU texture usable as both render target and render image (#11836) 2b8d8a0b03 [`d1d57fc`](https://github.com/rive-app/rive-wasm/commit/d1d57fc317aaf5c0a4497cd6834d0015464ca391)
+- Focus nodes (#11814) 017a4f41e3 [`c73c0e9`](https://github.com/rive-app/rive-wasm/commit/c73c0e9da3efa39715b63e05278fea0340af90cb)
+
+## [2.35.2](https://github.com/rive-app/rive-wasm/compare/2.35.1...2.35.2) - 2026-03-09
+
+### Commits
+
+- chore: tag 2.35.2 [`1156d6b`](https://github.com/rive-app/rive-wasm/commit/1156d6b6ed8b1a59cb044b551d015c20c84eb85d)
 - fix(gl): Enable linear filtering on the atlas texture (#11818) 3312a8f159 [`e8ccf0f`](https://github.com/rive-app/rive-wasm/commit/e8ccf0f6b634490f5faccef772f94a034f04091b)
 - fix: restore indexing order of view model symbols (#11817) f7c0374b8f [`05c2f29`](https://github.com/rive-app/rive-wasm/commit/05c2f29d0ebabe317f0a7ebecfceb7aa485dbac1)
 

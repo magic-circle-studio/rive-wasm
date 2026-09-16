@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 source ./get_emcc.sh
@@ -74,12 +74,11 @@ while getopts "clsr:" flag; do
         ;;
     r)
         OPTIONS=$((OPTIONS + 2))
-        if [ "${OPTARG}" = "skia" ]; then
-            PREMAKE_FLAGS+="--renderer=skia "
-        fi
         if [ "${OPTARG}" = "webgl2" ]; then
             # Emscripten has a bug when building PLS with LTO.
-            PREMAKE_FLAGS+="--renderer=webgl2 --no-rive-decoders --no-lto "
+            # with_rive_canvas brings in the ore GL backend and the deferred
+            # host layer for the synchronous deferred renderer.
+            PREMAKE_FLAGS+="--renderer=webgl2 --no-rive-decoders --no-lto --with_rive_canvas "
         fi
         ;;
     *)
@@ -107,6 +106,8 @@ elif [ "$OPTION" = "clean" ]; then
     exit 0
 elif [ "$OPTION" = "tools" ]; then
     $PREMAKE gmake2 $PREMAKE_FLAGS && CFLAGS=-DENABLE_QUERY_FLAT_VERTICES CXXFLAGS=-DENABLE_QUERY_FLAT_VERTICES make -C $OUT_DIR -j$NCPU
+elif [ "$OPTION" = "profiling" ]; then
+    $PREMAKE gmake2 $PREMAKE_FLAGS --config=release --profiling-funcs && make -C $OUT_DIR -j$NCPU
 elif [ "$OPTION" = "release" ]; then
     $PREMAKE gmake2 $PREMAKE_FLAGS --config=release gmake2 && make -C $OUT_DIR -j$NCPU
 else

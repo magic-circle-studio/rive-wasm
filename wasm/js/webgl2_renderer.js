@@ -62,6 +62,17 @@ Module["onRuntimeInitialized"] = function () {
       }
     };
 
+    // Make the GL context that actually backs this renderer's textures current.
+    // Offscreen instances own no GL context of their own; their draws — and the
+    // textures of any decoded image assets — live on the shared offscreen GL
+    // context.
+    this["bindContext"] = function () {
+      const r = this._realRenderer;
+      if (r && r._handle) {
+        GL.makeContextCurrent(r._handle);
+      }
+    };
+
     // Empty delete method to allow calling delete from the rive file without causing a crash
     this["delete"] = function () {
     };
@@ -90,17 +101,37 @@ Module["onRuntimeInitialized"] = function () {
 
     GL.makeContextCurrent(handle);
 
+    // Immediate at creation; deferred mode arrives later through
+    // attachSession(), which binds a file's session to this context.
     const renderer = makeRenderer(canvas.width, canvas.height);
     renderer._handle = handle;
     renderer._canvas = canvas;
     renderer._width = canvas.width;
     renderer._height = canvas.height;
     renderer._gl = gl;
-    var nativeDelete = renderer.delete;
-    renderer.delete = function () {
+    // Re-bind our context before any teardown that routes into glDelete*, which
+    // deref the *current* GLctx.
+    renderer["bindContext"] = function () {
+      if (this._handle) {
+        GL.makeContextCurrent(this._handle);
+      }
+    };
+    var nativeDelete = renderer["delete"];
+    renderer["delete"] = function () {
+      this["bindContext"]();
+      if (this._externalTextureGLId) {
+        GL.textures[this._externalTextureGLId] = null;
+        this._externalTextureGLId = null;
+      }
+      if (this._externalImageTextureGLIds) {
+        for (var i = 0; i < this._externalImageTextureGLIds.length; i++) {
+          GL.textures[this._externalImageTextureGLIds[i]] = null;
+        }
+        this._externalImageTextureGLIds = null;
+      }
       nativeDelete.call(this);
       GL.deleteContext(this._handle);
-      this._handle = this._canvas = this._width = this._width = this._gl = null;
+      this._handle = this._canvas = this._width = this._height = this._gl = null;
     };
     return renderer;
   }
@@ -109,10 +140,15 @@ Module["onRuntimeInitialized"] = function () {
   Module.makeRenderer = function (canvas, useOffScreenRenderer) {
     if (!_offscreenGL) {
       function MakeOffscreenGL(enableMSAA) {
-        const offscreenCanvas = document.createElement("canvas");
+        const offscreenCanvas = typeof document === "undefined"
+          ? new OffscreenCanvas(1, 1)
+          : document.createElement("canvas");
         offscreenCanvas.width = 1;
         offscreenCanvas.height = 1;
         _offscreenGL = makeGLRenderer(offscreenCanvas, enableMSAA);
+        if (!_offscreenGL) {
+          return null;
+        }
 
         _offscreenGL._hasPixelLocalStorage =
               Boolean(_offscreenGL._gl.getExtension("WEBGL_shader_pixel_local_storage"));
@@ -141,12 +177,17 @@ Module["onRuntimeInitialized"] = function () {
       }
 
       _offscreenGL = MakeOffscreenGL(/*enableMSAA =*/true);
+      if (!_offscreenGL) {
+        throw "Unable to create WebGL context, your environment may not support WebGL. Try out @rive-app/canvas as an alternative.";
+      }
       if (!_offscreenGL._enableAntialiasCanvas) {
         // This browser prefers "antialias:false". Re-create the offscreen without MSAA.
         _offscreenGL = MakeOffscreenGL(/*enableMSAA =*/false);
       }
     }
     if (useOffScreenRenderer) {
+      // No attachSession: offscreen renderers share one GL context across
+      // canvases, which a session cannot record for.
       return new OffscreenRenderer(canvas);
     }
     return makeGLRenderer(
@@ -362,38 +403,112 @@ Module["onRuntimeInitialized"] = function () {
   Module["resolveAnimationFrame"] = flushOffscreenRenderers;
 
   let load = Module["load"];
+  // The session fixes the file's mode at import: every resource it creates is
+  // typed by the factory it came from, so out of band assets have to decode
+  // through the same session (the CDN loader carries it for that reason).
   Module["load"] = function (
     bytes,
     fileAssetLoader,
-    enableRiveAssetCDN = true
+    enableRiveAssetCDN = true,
+    session = null
   ) {
     const loader = new Module["FallbackFileAssetLoader"]();
     if (fileAssetLoader !== undefined) {
       loader.addLoader(fileAssetLoader);
     }
     if (enableRiveAssetCDN) {
-      const cdnLoader = new Module["CDNFileAssetLoader"]();
+      const cdnLoader = new Module["CDNFileAssetLoader"](session);
       loader.addLoader(cdnLoader);
     }
 
-    return Promise.resolve(load(bytes, loader));
+    return Promise.resolve(load(bytes, loader, session ?? null));
   };
 
   const cppClear = Module["WebGL2Renderer"]["prototype"]["clear"];
   Module["WebGL2Renderer"]["prototype"]["clear"] = function () {
-    // Resize WebGL surface if the canvas size changed.
     GL.makeContextCurrent(this._handle);
-    const canvas = this._canvas;
-    if (this._width != canvas.width || this._height != canvas.height) {
-      this.resize(canvas.width, canvas.height);
-      this._width = canvas.width;
-      this._height = canvas.height;
+    // Only auto-resize from canvas when targeting the default framebuffer.
+    if (!this._externalTextureGLId) {
+      const canvas = this._canvas;
+      if (this._width != canvas.width || this._height != canvas.height) {
+        this.resize(canvas.width, canvas.height);
+        this._width = canvas.width;
+        this._height = canvas.height;
+      }
     }
     cppClear.call(this);
   };
 
-  Module["decodeImage"] = function (bytes, onComplete) {
-    let image = Module["decodeWebGL2Image"](bytes);
+  const cppBeginOverlayFrame = Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"];
+  Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"] = function () {
+    GL.makeContextCurrent(this._handle);
+    // Only auto-resize from canvas when targeting the default framebuffer.
+    if (!this._externalTextureGLId) {
+      const canvas = this._canvas;
+      if (this._width != canvas.width || this._height != canvas.height) {
+        this.resize(canvas.width, canvas.height);
+        this._width = canvas.width;
+        this._height = canvas.height;
+      }
+    }
+    cppBeginOverlayFrame.call(this);
+  };
+
+  const cppSetTargetTexture = Module["WebGL2Renderer"]["prototype"]["_setTargetTexture"];
+  const cppClearTargetTexture = Module["WebGL2Renderer"]["prototype"]["_clearTargetTexture"];
+
+  Module["WebGL2Renderer"]["prototype"]["setTargetTexture"] = function (webglTexture, width, height) {
+    GL.makeContextCurrent(this._handle);
+    // Unregister previous external texture if any.
+    if (this._externalTextureGLId) {
+      GL.textures[this._externalTextureGLId] = null;
+      this._externalTextureGLId = null;
+    }
+    // Register the WebGLTexture in Emscripten's GL.textures table
+    // so C++ can reference it as a GLuint.
+    var id = GL.getNewId(GL.textures);
+    GL.textures[id] = webglTexture;
+    this._externalTextureGLId = id;
+    cppSetTargetTexture.call(this, id, width, height);
+  };
+
+  Module["WebGL2Renderer"]["prototype"]["clearTargetTexture"] = function () {
+    GL.makeContextCurrent(this._handle);
+    cppClearTargetTexture.call(this);
+    if (this._externalTextureGLId) {
+      GL.textures[this._externalTextureGLId] = null;
+      this._externalTextureGLId = null;
+    }
+  };
+
+  const cppMakeImageFromGLTexture =
+    Module["WebGL2Renderer"]["prototype"]["_makeImageFromGLTexture"];
+
+  /**
+   * Create a RenderImage from an external WebGLTexture for zero-copy
+   * texture sharing. The returned image can be set on a data binding
+   * image property via ViewModelInstanceAssetImage.value().
+   *
+   * Rive takes ownership of the GL texture via adoptImageTexture —
+   * it will be deleted when the RenderImage is freed. Use a dedicated
+   * texture for Rive, not one shared with another renderer.
+   */
+  Module["WebGL2Renderer"]["prototype"]["makeImageFromGLTexture"] =
+    function (webglTexture, width, height) {
+      GL.makeContextCurrent(this._handle);
+      var id = GL.getNewId(GL.textures);
+      GL.textures[id] = webglTexture;
+      if (!this._externalImageTextureGLIds) {
+        this._externalImageTextureGLIds = [];
+      }
+      this._externalImageTextureGLIds.push(id);
+      return cppMakeImageFromGLTexture.call(this, id, width, height);
+    };
+
+  // Pass the session of the deferred file this image is bound into; an image
+  // decoded against any other factory is dropped when that file draws.
+  Module["decodeImage"] = function (bytes, onComplete, session = null) {
+    let image = Module["decodeWebGL2Image"](bytes, session ?? null);
     onComplete(image);
   };
 

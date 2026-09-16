@@ -1,5 +1,22 @@
+// Structural high-level asset wrappers accepted by the low-level setters.
+// Keep these declarations self-contained: advanced packages do not ship the
+// high-level finalizationRegistry module.
+interface ImageWrapper extends FinalizableTarget {
+  readonly nativeImage: ImageInternal;
+  unref(): void;
+}
+interface AudioWrapper extends FinalizableTarget {
+  readonly nativeAudio: AudioInternal;
+  unref(): void;
+}
+interface FontWrapper extends FinalizableTarget {
+  readonly nativeFont: FontInternal;
+  unref(): void;
+}
+
 interface RiveOptions {
   locateFile(file: string): string;
+  wasmBinary?: ArrayBuffer;
 }
 
 declare function Rive(options?: RiveOptions): Promise<RiveCanvas>;
@@ -29,9 +46,33 @@ export interface RiveCanvas {
   RenderPaintStyle: typeof RenderPaintStyle;
   StrokeCap: typeof StrokeCap;
   StrokeJoin: typeof StrokeJoin;
+  SurfaceMaterial: typeof SurfaceMaterial;
   decodeAudio: DecodeAudio;
   decodeImage: DecodeImage;
   decodeFont: DecodeFont;
+  // Returns a pointer value to the FontWrapper
+  setFallbackFontCallback: (callback: (missingGlyph: number, fallbackFontIndex: number, weight: number) => number | null) => void;
+
+  /**
+   * @experimental Creates a deferred recording session. Only present in builds
+   * with deferred rendering compiled in, so always feature-detect it.
+   *
+   * The session is a Factory: pass it to `load()` and to the decode APIs of the
+   * assets that belong to that file, and attach it to exactly one renderer with
+   * `attachSession()`.
+   *
+   * Teardown order should be:
+   *   1. release the file the session imported,
+   *   2. `detachSession()` on the renderer it is attached to,
+   *   3. `delete()` the session.
+   * Deleting an attached session leaves the renderer pointing at freed memory
+   * on the canvas2d build — the next frame either draws from freed heap or
+   * throws `Cannot pass deleted object`. Detach first, always, even when the
+   * renderer is about to be deleted too.
+   *
+   * @returns A DeferredSession, or undefined if the session could not be created
+   */
+  makeDeferredSession?(): DeferredSession | undefined;
 
   /**
    * Loads a Rive file for the runtime and returns a Rive-specific File class
@@ -39,12 +80,15 @@ export interface RiveCanvas {
    * @param buffer - Array buffer of a Rive file
    * @param assetLoader - FileAssetLoader used to optionally customize loading of font and image assets
    * @param enableRiveAssetCDN - boolean flag to allow loading assets from the Rive CDN, enabled by default.
+   * @param session - @experimental Deferred session to import through. The file's mode is fixed
+   * at import: pass null (the default) for an immediate file.
    * @returns A Promise for a Rive File class
    */
   load(
     buffer: Uint8Array,
     assetLoader?: FileAssetLoader,
     enableRiveAssetCDN?: boolean,
+    session?: DeferredSession | null,
   ): Promise<File>;
 
   /**
@@ -133,6 +177,24 @@ export interface RiveCanvas {
 //////////////
 
 /**
+ * @experimental A deferred recording session, owned by the RiveFile that imported
+ * through it.
+ *
+ * A session records for one ore/GL context, so it binds to exactly one renderer
+ * and can never rebind once detached. It must outlive the file it imported.
+ */
+export declare class DeferredSession {
+  delete(): void;
+  /**
+   * @experimental Whether anything was recorded into this session's stream this
+   * frame, including ore content the artboard's own change flag cannot see.
+   * Only meaningful before the renderer clears: clear opens a recording window
+   * that marks the stream, so a later read reports every frame as recorded.
+   */
+  recordedThisFrame(): boolean;
+}
+
+/**
  * Rive wrapper around a rendering context for a canvas element, implementing a subset of the APIs
  * from the rendering context interface
  */
@@ -155,22 +217,117 @@ export declare class RendererWrapper {
   drawPath(path: RenderPath, paint: RenderPaint): void;
   clipPath(path: RenderPath): void;
   /**
-   * Calls the context's clearRect() function to clear the entire canvas. Crucial to call
-   * this at the start of the render loop to clear the canvas before drawing the next frame
+   * Begins a frame. Crucial to call this at the start of the render loop: besides clearing
+   * the canvas, it registers the renderer so that its queued draws actually get flushed.
    *
-   * For the underlying API, check
+   * Pass clear=false to draw on top of whatever the canvas already holds instead of
+   * starting from a blank one.
+   *
+   * For the underlying clear, check
    * https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/clearRect
+   */
+  beginFrame(clear?: boolean): void;
+  /**
+   * @deprecated Use {@link beginFrame} instead. Equivalent to `beginFrame(true)`.
    */
   clear(): void;
   delete(): void;
   flush(): void;
+  /**
+   * Re-binds Rive's internal textures and invalidates the GL state
+   * cache. Call before Rive renders when another renderer (e.g.
+   * PixiJS) has been using the shared WebGL context.
+   */
+  invalidateGLState(): void;
+  /**
+   * Unbinds all Rive-internal VAOs, buffers, framebuffers, and
+   * textures. Call after Rive renders, before yielding the shared
+   * WebGL context to another renderer (e.g. PixiJS).
+   */
+  unbindGLInternalResources(): void;
+  /**
+   * Begin a frame without clearing the framebuffer. Use instead of
+   * clear() when sharing a WebGL context with another renderer
+   * whose output should be preserved.
+   */
+  beginOverlayFrame(): void;
+  /**
+   * Set an external WebGL texture as the render target. When set,
+   * clear()/beginOverlayFrame()/flush() render to this texture
+   * instead of the default framebuffer (canvas).
+   *
+   * The texture must be on the same WebGL context. Rive does NOT
+   * own the texture — the caller manages its lifecycle.
+   */
+  setTargetTexture(texture: WebGLTexture, width: number, height: number): void;
+  /**
+   * Remove the external texture target, reverting to default
+   * framebuffer (canvas) rendering.
+   */
+  clearTargetTexture(): void;
+  /**
+   * Create a RenderImage from an external WebGLTexture for zero-copy
+   * texture sharing. The returned image can be set on a data binding
+   * image property via ViewModelInstanceAssetImage.value().
+   *
+   * Rive takes ownership of the GL texture via adoptImageTexture —
+   * it will be deleted when the RenderImage is freed. The caller
+   * must ensure the RenderImage outlives any external use of the
+   * texture, or use a dedicated texture for Rive.
+   */
+  makeImageFromGLTexture(
+    texture: WebGLTexture,
+    width: number,
+    height: number
+  ): ImageInternal;
+  /** Selects the default material for supported subsequent artboard draws. */
+  setSurfaceMaterial(
+    material: SurfaceMaterial,
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+    timeSeconds: number
+  ): void;
   translate(x: number, y: number): void;
   rotate(angle: number): void;
+  /**
+   * (WebGL only) Makes the GL context that backs this renderer's textures current, before
+   * performing any WASM teardown that frees resources
+   */
+  bindContext(): void;
+  /**
+   * @experimental Binds a deferred session to this renderer's context: draws record
+   * into the session and replay at flush. Absent on renderers that cannot replay a
+   * session (an offscreen renderer, or a build without deferred support).
+   *
+   * @param session - The session the file was imported through
+   * @returns false if this renderer already has a session, or the session is (or was)
+   * bound elsewhere. Attaching is once per session: re-import into a fresh session instead
+   */
+  attachSession?(session: DeferredSession): boolean;
+  /**
+   * @experimental Releases the attached session's replay state. The session can never
+   * be attached again.
+   */
+  detachSession?(): void;
+  /**
+   * @experimental Whether a deferred session is currently attached.
+   */
+  deferredActive?(): boolean;
 }
 
 export declare class RenderPathWrapper {
   reset(): void;
-  addPath(path: CommandPath, transform: Mat2D): void;
+  addPath(
+    path: CommandPath,
+    xx: number,
+    xy: number,
+    yx: number,
+    yy: number,
+    tx: number,
+    ty: number,
+  ): void;
   fillRule(value: FillRule): void;
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
@@ -219,11 +376,11 @@ export declare class Renderer extends RendererWrapper {
   ): void;
 }
 
-export declare class CommandPath {}
+export declare class CommandPath { }
 
-export declare class RenderPath extends RenderPathWrapper {}
+export declare class RenderPath extends RenderPathWrapper { }
 
-export declare class RenderPaint extends RenderPaintWrapper {}
+export declare class RenderPaint extends RenderPaintWrapper { }
 
 /////////////////////
 // CANVAS RENDERER //
@@ -273,7 +430,7 @@ export declare class CanvasRenderPaint extends RenderPaint {
   ): void;
 }
 
-export declare class CanvasRenderPath extends RenderPath {}
+export declare class CanvasRenderPath extends RenderPath { }
 
 export interface CanvasRenderFactory {
   makeRenderPaint(): CanvasRenderPaint;
@@ -290,8 +447,16 @@ export class Audio {
 export interface AudioCallback {
   (audio: Audio): void;
 }
+/**
+ * The trailing session is the one of the deferred file the asset is bound into;
+ * an asset decoded against any other factory is dropped when that file draws.
+ */
 export interface DecodeAudio {
-  (bytes: Uint8Array, callback: AudioCallback): void;
+  (
+    bytes: Uint8Array,
+    callback: AudioCallback,
+    session?: DeferredSession | null,
+  ): void;
 }
 export class ImageInternal {
   unref(): void;
@@ -304,20 +469,30 @@ export interface ImageCallback {
   (image: Image): void;
 }
 export interface DecodeImage {
-  (bytes: Uint8Array, callback: ImageCallback): void;
+  (
+    bytes: Uint8Array,
+    callback: ImageCallback,
+    session?: DeferredSession | null,
+  ): void;
 }
 export class FontInternal {
   unref(): void;
+  ptr(): number;
 }
 export class Font {
   unref(): void;
+  ptr(): number;
   get nativeFont(): FontInternal;
 }
 export interface FontCallback {
   (font: Font): void;
 }
 export interface DecodeFont {
-  (bytes: Uint8Array, callback: FontCallback): void;
+  (
+    bytes: Uint8Array,
+    callback: FontCallback,
+    session?: DeferredSession | null,
+  ): void;
 }
 
 //////////
@@ -374,6 +549,12 @@ export declare class File {
    * @returns DataEnum array in the Rive file
    */
   enums(): DataEnum[];
+
+  /**
+   * Returns the names of the file's global view models, in file order.
+   * @returns array of global view model names
+   */
+  globalViewModelNames(): string[];
 
   unref(): void;
 
@@ -577,6 +758,27 @@ export declare class Artboard {
    * @param instance - Renderer context to draw with
    */
   bindViewModelInstance(instance: ViewModelInstance): void;
+  /**
+   * Sets the main view model instance without rebinding. Call bind() to apply.
+   */
+  setViewModelInstance(instance: ViewModelInstance): void;
+  /**
+   * Applies the current data context (rebinds data binds). No-op if nothing set.
+   */
+  bind(): void;
+  /**
+   * Sets/replaces the global view model instance bound under the given global
+   * view model name without rebinding, preserving the main instance and the
+   * other globals' order. Call bind() to apply.
+   * @returns false if the name does not match a global view model in the file.
+   */
+  setGlobalViewModelInstance(name: string, instance: ViewModelInstance): boolean;
+  /**
+   * @returns the global view model instance currently bound under the given
+   * name (the runtime-seeded default or a previously set instance), or null if
+   * the name does not match a global view model in the file.
+   */
+  globalViewModelInstance(name: string): ViewModelInstance | null;
 
   didChange(): boolean;
 }
@@ -750,6 +952,18 @@ export interface RiveEventCustomProperties {
   [key: string]: number | boolean | string;
 }
 
+/**
+ * Snapshot of the focus state returned by StateMachineInstance.focusState().
+ * Poll this each frame after advanceAndApply() to detect focus changes and
+ * determine whether a virtual keyboard should be shown or hidden.
+ */
+export interface FocusState {
+  /** True if any element currently holds focus in this state machine's active focus manager. */
+  hasFocus: boolean;
+  /** True if the focused element accepts keyboard input (e.g. a TextInput node). */
+  expectsKeyboardInput: boolean;
+}
+
 export declare class LinearAnimation {
   /**
    * The animation's loop type
@@ -873,6 +1087,35 @@ export declare class StateMachineInstance {
   pointerExit(x: number, y: number, id: number): void;
 
   /**
+   * Returns true if this state machine has any focus nodes registered in its focus tree.
+   * Since the focus tree is unified across nested artboards, this covers the full scene.
+   * Use this to gate whether tab/focus traversal DOM listeners should be attached.
+   */
+  hasFocusNodes(): boolean;
+
+  /**
+   * Move focus to the next focusable node in the focus tree via the state machine's focus manager.
+   */
+  focusNext(): boolean;
+
+  /**
+   * Move focus to the previous focusable node in the focus tree via the state machine's focus manager.
+   */
+  focusPrevious(): boolean;
+
+  /**
+   * Clear focus from the Rive focus tree.
+   */
+  clearFocus(): void;
+
+  /**
+   * Returns metadata about current focus state:
+   *   1. Whether any node in the focus tree is currently focused
+   *   2. Whether the currently focused node expects keyboard input (i.e. keyboard/text input listener)
+   */
+  focusState(): FocusState;
+
+  /**
    * Deletes the underlying instance created via the WASM. It's important to clean up this instance
    * when no longer in use
    */
@@ -883,6 +1126,105 @@ export declare class StateMachineInstance {
    * @param instance - Renderer context to draw with
    */
   bindViewModelInstance(instance: ViewModelInstance): void;
+  /**
+   * Sets the main view model instance without rebinding. Call bind() to apply.
+   */
+  setViewModelInstance(instance: ViewModelInstance): void;
+  /**
+   * Applies the current data context (rebinds data binds). No-op if nothing set.
+   */
+  bind(): void;
+  /**
+   * Sets/replaces the global view model instance bound under the given global
+   * view model name without rebinding, preserving the main instance and the
+   * other globals' order. Call bind() to apply.
+   * @returns false if the name does not match a global view model in the file.
+   */
+  setGlobalViewModelInstance(name: string, instance: ViewModelInstance): boolean;
+  /**
+   * @returns the global view model instance currently bound under the given
+   * name (the runtime-seeded default or a previously set instance), or null if
+   * the name does not match a global view model in the file.
+   */
+  globalViewModelInstance(name: string): ViewModelInstance | null;
+
+  /**
+   * Enables semantic tree tracking for this state machine instance.
+   * Once enabled, the runtime builds and maintains a semantic tree that
+   * describes the accessible structure of the artboard (roles, labels,
+   * states, bounds). Call this before using drainSemanticsDiff().
+   */
+  enableSemantics(): void;
+
+  /**
+   * Returns the incremental semantic diff since the last call, or null if
+   * nothing changed. Each diff contains arrays of added/removed/moved nodes,
+   * updated semantic properties, updated geometry, and children reorderings.
+   */
+  drainSemanticsDiff(): SemanticsDiff | null;
+
+  /**
+   * Fire a semantic action on the node with the given ID.
+   * @param nodeId - The semantic node ID to target
+   * @param actionType - 0 = tap, 1 = increase, 2 = decrease
+   */
+  fireSemanticAction(nodeId: number, actionType: number): void;
+
+  /**
+   * Request focus on the semantic node with the given ID.
+   * Routes through SemanticManager to focus the FocusData sibling of the
+   * SemanticData that owns the node. Returns true if focus was set.
+   * @param nodeId - The semantic node ID to focus
+   * @returns boolean - True if focus was set, false otherwise
+   */
+  focusSemanticNode(nodeId: number): boolean;
+
+  /**
+   * Clears focus from the currently focused node in the focus tree.
+   */
+  clearFocus(): void;
+}
+
+export interface SemanticsDiffNode {
+  id: number;
+  role: number;
+  label: string;
+  value: string;
+  hint: string;
+  stateFlags: number;
+  traitFlags: number;
+  headingLevel: number;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  parentId: number;
+  siblingIndex: number;
+}
+
+export interface SemanticsBoundsUpdate {
+  id: number;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export interface SemanticsChildrenUpdate {
+  parentId: number;
+  childIds: number[];
+}
+
+export interface SemanticsDiff {
+  frameNumber: number;
+  treeVersion: number;
+  rootId: number;
+  removed: number[];
+  added: SemanticsDiffNode[];
+  moved: SemanticsDiffNode[];
+  childrenUpdated: SemanticsChildrenUpdate[];
+  updatedSemantic: SemanticsDiffNode[];
+  updatedGeometry: SemanticsBoundsUpdate[];
 }
 
 export declare class SMIInput {
@@ -916,6 +1258,7 @@ export declare class SMIInput {
 export declare type ViewModelProperty = {
   name: string;
   type: DataType;
+  enumName?: string;
 };
 
 export declare class ViewModelInstanceValue {
@@ -970,6 +1313,14 @@ export declare class ViewModelInstanceList extends ViewModelInstanceValue {
 }
 export declare class ViewModelInstanceAssetImage extends ViewModelInstanceValue {
   value(image: ImageInternal | null): void;
+  /**
+   * Selects the material for this image binding. Image meshes and renderer
+   * fallback draws remain unmaterialized.
+   */
+  setSurfaceMaterial(material: SurfaceMaterial): void;
+}
+export declare class ViewModelInstanceAssetFont extends ViewModelInstanceValue {
+  value(font: FontInternal | null): void;
 }
 export declare class ViewModelInstanceArtboard extends ViewModelInstanceValue {
   value(artboard: BindableArtboard | Artboard): void;
@@ -987,6 +1338,7 @@ export declare class ViewModelInstance {
   list(path: string): ViewModelInstanceList;
   viewModel(path: string): ViewModelInstance;
   image(path: string): ViewModelInstanceAssetImage;
+  font(path: string): ViewModelInstanceAssetFont;
   artboard(path: string): ViewModelInstanceArtboard;
   replaceViewModel(path: string, value: ViewModelInstance): boolean;
   incrementReferenceCount(): void;
@@ -994,6 +1346,7 @@ export declare class ViewModelInstance {
   delete(): void;
   unref(): void;
   getProperties(): ViewModelProperty[];
+  getViewModelName(): string;
 }
 
 export declare class ViewModel {
@@ -1013,26 +1366,40 @@ export declare class DataEnum {
   get values(): string[];
 }
 
-export declare class SMIBool {}
+export declare class SMIBool { }
 
-export declare class SMINumber {}
+export declare class SMINumber { }
 
-export declare class SMITrigger {}
+export declare class SMITrigger { }
 
 ///////////
 // ENUMS //
 ///////////
 
 export enum DataType {
-  none,
-  string,
-  number,
-  boolean,
-  color,
-  list,
-  enumType,
-  trigger,
-  viewModel,
+  none = 'none',
+  string = 'string',
+  number = 'number',
+  boolean = 'boolean',
+  color = 'color',
+  list = 'list',
+  enumType = 'enumType',
+  trigger = 'trigger',
+  viewModel = 'viewModel',
+  integer = 'integer',
+  listIndex = 'listIndex',
+  image = 'image',
+  artboard = 'artboard',
+}
+
+/** Renderer-native material selected by an artboard or image binding. */
+export enum SurfaceMaterial {
+  /** Draw without a surface material. */
+  None = 0,
+  /** Use the enclosing artboard's material. */
+  Inherit = 3,
+  Rainbow = 2,
+  Gold = 1,
 }
 
 export enum Fit {
@@ -1178,7 +1545,12 @@ export declare class FileAsset {
   isFont: boolean;
   cdnUuid: string;
 
-  decode(bytes: Uint8Array): void;
+  /**
+   * @param session - @experimental The session of the deferred file this asset belongs
+   * to, null for an immediate file. Wired by the runtime; pass it explicitly only when
+   * calling the native asset directly.
+   */
+  decode(bytes: Uint8Array, session?: DeferredSession | null): void;
   get nativeAsset(): FileAssetInternal;
 }
 
@@ -1195,7 +1567,7 @@ export declare class FileAssetInternal {
   isFont: boolean;
   cdnUuid: string;
 
-  decode(bytes: Uint8Array): void;
+  decode(bytes: Uint8Array, session?: DeferredSession | null): void;
 }
 
 export declare class AudioAssetInternal extends FileAssetInternal {
@@ -1207,7 +1579,7 @@ export declare class AudioAssetInternal extends FileAssetInternal {
  * decoded Audio (via the `decodeAudio()` API) to set a new Audio on the Rive FileAsset
  */
 export declare class AudioAsset extends FileAsset {
-  setAudioSource(audio: Audio): void;
+  setAudioSource(audio: Audio | AudioWrapper): void;
 }
 
 export declare class ImageAssetInternal extends FileAssetInternal {
@@ -1218,7 +1590,7 @@ export declare class ImageAssetInternal extends FileAssetInternal {
  * decoded Image (via the `decodeImage()` API) to set a new Image on the Rive FileAsset
  */
 export declare class ImageAsset extends FileAsset {
-  setRenderImage(image: Image): void;
+  setRenderImage(image: Image | ImageWrapper): void;
 }
 
 export declare class FontAssetInternal extends FileAssetInternal {
@@ -1229,10 +1601,13 @@ export declare class FontAssetInternal extends FileAssetInternal {
  * decoded Font (via the `decodeFont()` API) to set a new Font on the Rive FileAsset
  */
 export declare class FontAsset extends FileAsset {
-  setFont(font: Font): void;
+  // Accepts the high-level `FontWrapper` returned by `decodeFont()` as well as
+  // the low-level embind `Font`. `FontWrapper` lacks the `ptr()` member that was
+  // added to `Font`
+  setFont(font: Font | FontWrapper): void;
 }
 
-export declare class FileAssetLoader {}
+export declare class FileAssetLoader { }
 
 export declare class CustomFileAssetLoader extends FileAssetLoader {
   constructor({ loadContents }: { loadContents: Function });

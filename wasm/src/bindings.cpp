@@ -9,6 +9,9 @@
 #include "rive/animation/state_machine_bool.hpp"
 #include "rive/animation/state_machine_input_instance.hpp"
 #include "rive/animation/state_machine_instance.hpp"
+#include "rive/animation/semantic_listener_group.hpp"
+#include "rive/semantic/semantic_manager.hpp"
+#include "rive/semantic/semantic_snapshot.hpp"
 #include "rive/animation/state_machine_number.hpp"
 #include "rive/animation/state_machine_trigger.hpp"
 #include "rive/artboard.hpp"
@@ -39,6 +42,8 @@
 #include "rive/renderer.hpp"
 #include "rive/shapes/cubic_vertex.hpp"
 #include "rive/shapes/path.hpp"
+#include "rive/text/font_hb.hpp"
+#include "rive/text/utf.hpp"
 #include "rive/text/text_style.hpp"
 #include "rive/text/text_value_run.hpp"
 #include "rive/text/text.hpp"
@@ -78,8 +83,14 @@
 
 using namespace emscripten;
 
-// Returns the global factory (either c2d, skia, or webgl2 backed)
+// Returns the immediate factory (either c2d, skia, or webgl2 backed)
 extern rive::Factory* jsFactory();
+
+// Resolves the optional deferred session that import and decode entry points
+// accept: the session when JS passes one, jsFactory() when it passes null or
+// omits it. Backend defined next to jsFactory. Routing is per call and never
+// global, so a deferred file leaves every other instance on the page alone.
+extern rive::Factory* jsSessionFactory(const emscripten::val& session);
 
 // We had to do this because binding the core class const defined types directly
 // caused wasm-ld linker issues. See
@@ -152,6 +163,92 @@ bool hasListeners(rive::StateMachineInstance* smi)
         }
     }
     return false;
+}
+
+emscripten::val semanticsDiffNodeToVal(const rive::SemanticsDiffNode& node)
+{
+    emscripten::val obj = emscripten::val::object();
+    obj.set("id", node.id);
+    obj.set("role", node.role);
+    obj.set("label", node.label);
+    obj.set("value", node.value);
+    obj.set("hint", node.hint);
+    obj.set("stateFlags", node.stateFlags);
+    obj.set("traitFlags", node.traitFlags);
+    obj.set("headingLevel", node.headingLevel);
+    obj.set("minX", node.minX);
+    obj.set("minY", node.minY);
+    obj.set("maxX", node.maxX);
+    obj.set("maxY", node.maxY);
+    obj.set("parentId", node.parentId);
+    obj.set("siblingIndex", node.siblingIndex);
+    return obj;
+}
+
+emscripten::val semanticsDiffToVal(const rive::SemanticsDiff& diff)
+{
+    emscripten::val result = emscripten::val::object();
+    result.set("frameNumber", static_cast<double>(diff.frameNumber));
+    result.set("treeVersion", static_cast<double>(diff.treeVersion));
+    result.set("rootId", diff.rootId);
+
+    emscripten::val removed = emscripten::val::array();
+    for (auto id : diff.removed)
+    {
+        removed.call<void>("push", id);
+    }
+    result.set("removed", removed);
+
+    emscripten::val added = emscripten::val::array();
+    for (const auto& node : diff.added)
+    {
+        added.call<void>("push", semanticsDiffNodeToVal(node));
+    }
+    result.set("added", added);
+
+    emscripten::val moved = emscripten::val::array();
+    for (const auto& node : diff.moved)
+    {
+        moved.call<void>("push", semanticsDiffNodeToVal(node));
+    }
+    result.set("moved", moved);
+
+    emscripten::val childrenUpdated = emscripten::val::array();
+    for (const auto& update : diff.childrenUpdated)
+    {
+        emscripten::val obj = emscripten::val::object();
+        obj.set("parentId", update.parentId);
+        emscripten::val childIds = emscripten::val::array();
+        for (auto childId : update.childIds)
+        {
+            childIds.call<void>("push", childId);
+        }
+        obj.set("childIds", childIds);
+        childrenUpdated.call<void>("push", obj);
+    }
+    result.set("childrenUpdated", childrenUpdated);
+
+    emscripten::val updatedSemantic = emscripten::val::array();
+    for (const auto& node : diff.updatedSemantic)
+    {
+        updatedSemantic.call<void>("push", semanticsDiffNodeToVal(node));
+    }
+    result.set("updatedSemantic", updatedSemantic);
+
+    emscripten::val updatedGeometry = emscripten::val::array();
+    for (const auto& update : diff.updatedGeometry)
+    {
+        emscripten::val obj = emscripten::val::object();
+        obj.set("id", update.id);
+        obj.set("minX", update.minX);
+        obj.set("minY", update.minY);
+        obj.set("maxX", update.maxX);
+        obj.set("maxY", update.maxY);
+        updatedGeometry.call<void>("push", obj);
+    }
+    result.set("updatedGeometry", updatedGeometry);
+
+    return result;
 }
 
 emscripten::val createRiveEventObject(rive::Event* event)
@@ -262,6 +359,10 @@ emscripten::val buildProperties(std::vector<rive::PropertyData>& properties)
                 break;
             case rive::DataType::enumType:
                 val = "enumType";
+                if (!prop.enumName.empty())
+                {
+                    jsProp.set("enumName", prop.enumName);
+                }
                 break;
             case rive::DataType::trigger:
                 val = "trigger";
@@ -277,6 +378,12 @@ emscripten::val buildProperties(std::vector<rive::PropertyData>& properties)
                 break;
             case rive::DataType::assetImage:
                 val = "image";
+                break;
+            case rive::DataType::assetFont:
+                val = "font";
+                break;
+            case rive::DataType::assetBlob:
+                val = "blob";
                 break;
             case rive::DataType::artboard:
                 val = "artboard";
@@ -337,7 +444,11 @@ public:
     };
 };
 
-rive::File* load(emscripten::val byteArray, rive::FileAssetLoader* fileAssetLoader)
+// The optional trailing session fixes the file's mode at import: its resources
+// are typed by the factory that made them and can never switch afterwards.
+rive::File* load(emscripten::val byteArray,
+                 rive::FileAssetLoader* fileAssetLoader,
+                 emscripten::val session)
 {
     std::vector<unsigned char> rv;
 
@@ -348,7 +459,10 @@ rive::File* load(emscripten::val byteArray, rive::FileAssetLoader* fileAssetLoad
     memoryView.call<void>("set", byteArray);
 
     // QUESTION (max) we ignore the result currently, we could use it and throw exceptions with it.
-    auto file = rive::File::import(rv, jsFactory(), nullptr, fileAssetLoader);
+    // Importing through the deferred session wires scripting by itself: the
+    // context derives the ore recorder and canvas host from its import
+    // factory, and the session carries the bound render context.
+    auto file = rive::File::import(rv, jsSessionFactory(session), nullptr, fileAssetLoader);
     // Need to manually ref the file to keep alive until the JS runtime cleans it up.
     return file.release();
 }
@@ -370,7 +484,9 @@ public:
     rive::rcp<rive::Font> font() { return m_font; }
 };
 
-FontWrapper* decodeFont(emscripten::val byteArray)
+// Standalone method to create a Rive Font from byte array. Pass the session of
+// the deferred file this font is bound into, otherwise nothing.
+FontWrapper* decodeFont(emscripten::val byteArray, emscripten::val session)
 {
     std::vector<unsigned char> vector;
 
@@ -379,10 +495,61 @@ FontWrapper* decodeFont(emscripten::val byteArray)
 
     emscripten::val memoryView{emscripten::typed_memory_view(l, vector.data())};
     memoryView.call<void>("set", byteArray);
-    auto font = new FontWrapper(jsFactory()->decodeFont(vector));
+    // Calls into the shared.js layer to decode the font with this vector
+    auto font = new FontWrapper(jsSessionFactory(session)->decodeFont(vector));
 
     return font;
 }
+
+#ifdef WITH_RIVE_TEXT
+// Holds JS callback set by setFallbackFontCb
+static emscripten::val jsFallbackFontCbRef = emscripten::val::null();
+
+static rive::rcp<rive::Font> fallbackProc(const rive::Unichar missing,
+                                          const uint32_t fallbackIndex,
+                                          const rive::Font* font)
+{
+    if (jsFallbackFontCbRef.isNull() || jsFallbackFontCbRef.isUndefined())
+    {
+        return nullptr;
+    }
+
+    // Extract weight from the requesting font
+    const HBFont* hbFont = static_cast<const HBFont*>(font);
+    float weight = hbFont->getWeight();
+
+    // Synchronously call JS: (missing, fallbackIndex, weight) -> FontWrapper* | null
+    emscripten::val result = jsFallbackFontCbRef(missing, fallbackIndex, weight);
+    if (result.isNull() || result.isUndefined())
+    {
+        return nullptr;
+    }
+
+    intptr_t ptr = result.as<intptr_t>();
+    if (ptr == 0)
+    {
+        return nullptr;
+    }
+
+    FontWrapper* wrapper = reinterpret_cast<FontWrapper*>(ptr);
+    return wrapper->font();
+}
+
+// This is exposed to JS to allow client to pass in callback to handle fallback font selection
+void setFallbackFontCb(emscripten::val cb)
+{
+    if (!cb.isNull() && !cb.isUndefined())
+    {
+        jsFallbackFontCbRef = cb;
+        rive::Font::gFallbackProc = fallbackProc;
+    }
+    else
+    {
+        jsFallbackFontCbRef = emscripten::val::null();
+        rive::Font::gFallbackProc = nullptr;
+    }
+}
+#endif // WITH_RIVE_TEXT
 
 class AudioWrapper
 {
@@ -395,7 +562,8 @@ public:
     rive::rcp<rive::AudioSource> audio() { return m_audio; }
 };
 
-AudioWrapper* decodeAudio(emscripten::val byteArray)
+// Same optional trailing session as decodeFont.
+AudioWrapper* decodeAudio(emscripten::val byteArray, emscripten::val session)
 {
     std::vector<unsigned char> vector;
 
@@ -404,7 +572,7 @@ AudioWrapper* decodeAudio(emscripten::val byteArray)
 
     emscripten::val memoryView{emscripten::typed_memory_view(l, vector.data())};
     memoryView.call<void>("set", byteArray);
-    auto audio = new AudioWrapper(jsFactory()->decodeAudio(vector));
+    auto audio = new AudioWrapper(jsSessionFactory(session)->decodeAudio(vector));
 
     return audio;
 }
@@ -445,6 +613,9 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
     function("ptrToFontAsset", &ptrToFontAsset, allow_raw_pointers());
     function("decodeAudio", &decodeAudio, allow_raw_pointers());
     function("decodeFont", &decodeFont, allow_raw_pointers());
+#ifdef WITH_RIVE_TEXT
+    function("setFallbackFontCb", &setFallbackFontCb, allow_raw_pointers());
+#endif
     function("load", &load, allow_raw_pointers());
     function("jsFactory", &jsFactory, allow_raw_pointers());
     function("computeAlignment", &computeAlignment);
@@ -601,13 +772,27 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
                       return jsProperties;
                   }),
                   allow_raw_pointers())
+        .function("globalViewModelNames",
+                  optional_override([](const rive::File& self) {
+                      emscripten::val names = emscripten::val::array();
+                      for (auto& name : self.globalViewModelNames())
+                      {
+                          names.call<void>("push", name);
+                      }
+                      return names;
+                  }),
+                  allow_raw_pointers())
         .function("unref",
                   optional_override([](const rive::File& self) -> void { self.unref(); }),
                   allow_raw_pointers())
         .property("hasAudio", optional_override([](const rive::File& self) -> bool {
                       return self.hasAudio();
                   }));
-    class_<FontWrapper>("FontWrapper").function("unref", &FontWrapper::unref);
+    class_<FontWrapper>("FontWrapper")
+        .function("unref", &FontWrapper::unref)
+        .function("ptr", optional_override([](FontWrapper& self) -> intptr_t {
+                      return reinterpret_cast<intptr_t>(&self);
+                  }));
     class_<AudioWrapper>("AudioWrapper").function("unref", &AudioWrapper::unref);
     class_<rive::Artboard>("ArtboardBase");
     class_<rive::ArtboardInstance, base<rive::Artboard>>("Artboard")
@@ -742,6 +927,33 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
                       self.bindViewModelInstance(runtimeInstance->instance());
                   }),
                   allow_raw_pointers())
+        .function("setViewModelInstance",
+                  optional_override([](rive::ArtboardInstance& self,
+                                       rive::ViewModelInstanceRuntime* runtimeInstance) {
+                      self.setViewModelInstance(runtimeInstance->instance());
+                  }),
+                  allow_raw_pointers())
+        .function("bind", optional_override([](rive::ArtboardInstance& self) { self.bind(); }))
+        .function("setGlobalViewModelInstance",
+                  optional_override([](rive::ArtboardInstance& self,
+                                       const std::string& name,
+                                       rive::ViewModelInstanceRuntime* runtimeInstance) -> bool {
+                      return self.setGlobalViewModelInstance(name, runtimeInstance->instance());
+                  }),
+                  allow_raw_pointers())
+        .function("globalViewModelInstance",
+                  optional_override([](rive::ArtboardInstance& self,
+                                       const std::string& name) -> rive::ViewModelInstanceRuntime* {
+                      auto vmi = self.globalViewModelInstance(name);
+                      if (vmi == nullptr)
+                      {
+                          return nullptr;
+                      }
+                      auto* runtime = new rive::ViewModelInstanceRuntime(vmi);
+                      runtime->ref();
+                      return runtime;
+                  }),
+                  allow_raw_pointers())
         .property("bounds", optional_override([](const rive::ArtboardInstance& self) -> rive::AABB {
                       return self.bounds();
                   }))
@@ -765,14 +977,6 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
                       self.buildFocusTree(parentNode ? rive::ref_rcp(parentNode) : nullptr);
                   }),
                   allow_raw_pointers());
-
-    class_<rive::FocusNode>("FocusNode")
-        .function("canFocus", select_overload<bool() const>(&rive::FocusNode::canFocus))
-        .function("canTraverse", select_overload<bool() const>(&rive::FocusNode::canTraverse))
-        .function("tabIndex", select_overload<int() const>(&rive::FocusNode::tabIndex))
-        .property("name",
-                  select_overload<const std::string&() const>(&rive::FocusNode::name),
-                  select_overload<void(const std::string&)>(&rive::FocusNode::name));
 
     class_<rive::TransformComponent>("TransformComponent")
         .property("scaleX",
@@ -895,18 +1099,22 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
 
                 return ss.str();
             }))
-        .function("decode",
-                  optional_override([](rive::FileAsset& self, emscripten ::val byteArray) {
-                      auto length = byteArray["byteLength"].as<unsigned>();
-                      rive::SimpleArray<uint8_t> bytes((size_t)length);
+        // The session belongs to the file this asset was imported from; an
+        // out of band asset decoded against a different factory would be
+        // dropped at draw.
+        .function(
+            "decode",
+            optional_override(
+                [](rive::FileAsset& self, emscripten ::val byteArray, emscripten::val session) {
+                    auto length = byteArray["byteLength"].as<unsigned>();
+                    rive::SimpleArray<uint8_t> bytes((size_t)length);
 
-                      emscripten::val memoryView{
-                          emscripten::typed_memory_view(length, bytes.data())};
+                    emscripten::val memoryView{emscripten::typed_memory_view(length, bytes.data())};
 
-                      memoryView.call<void>("set", byteArray);
-                      self.decode(bytes, jsFactory());
-                  }),
-                  allow_raw_pointers());
+                    memoryView.call<void>("set", byteArray);
+                    self.decode(bytes, jsSessionFactory(session));
+                }),
+            allow_raw_pointers());
 
     class_<rive::ImageAsset, base<rive::FileAsset>>("ImageAsset")
         .function(
@@ -1005,31 +1213,85 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
                       self.bindViewModelInstance(runtimeInstance->instance());
                   }),
                   allow_raw_pointers())
-        .function("focusManager",
-                  optional_override([](rive::StateMachineInstance& self) -> rive::FocusManager* {
-                      return self.focusManager();
+        .function("setViewModelInstance",
+                  optional_override([](rive::StateMachineInstance& self,
+                                       rive::ViewModelInstanceRuntime* runtimeInstance) {
+                      self.setViewModelInstance(runtimeInstance->instance());
                   }),
-                  allow_raw_pointers());
-
-    class_<rive::FocusManager>("FocusManager")
-        .function("focusNext", &rive::FocusManager::focusNext)
-        .function("focusPrevious", &rive::FocusManager::focusPrevious)
-        .function("focusLeft", &rive::FocusManager::focusLeft)
-        .function("focusRight", &rive::FocusManager::focusRight)
-        .function("focusUp", &rive::FocusManager::focusUp)
-        .function("focusDown", &rive::FocusManager::focusDown)
-        .function("primaryFocusBounds", optional_override([](rive::FocusManager& self) -> val {
-                      rive::AABB bounds;
-                      if (!self.primaryFocusBounds(bounds))
+                  allow_raw_pointers())
+        .function("bind", optional_override([](rive::StateMachineInstance& self) { self.bind(); }))
+        .function("setGlobalViewModelInstance",
+                  optional_override([](rive::StateMachineInstance& self,
+                                       const std::string& name,
+                                       rive::ViewModelInstanceRuntime* runtimeInstance) -> bool {
+                      return self.setGlobalViewModelInstance(name, runtimeInstance->instance());
+                  }),
+                  allow_raw_pointers())
+        .function("globalViewModelInstance",
+                  optional_override([](rive::StateMachineInstance& self,
+                                       const std::string& name) -> rive::ViewModelInstanceRuntime* {
+                      auto vmi = self.globalViewModelInstance(name);
+                      if (vmi == nullptr)
                       {
-                          return val::null();
+                          return nullptr;
                       }
-                      val result = val::object();
-                      result.set("minX", bounds.minX);
-                      result.set("minY", bounds.minY);
-                      result.set("maxX", bounds.maxX);
-                      result.set("maxY", bounds.maxY);
-                      return result;
+                      auto* runtime = new rive::ViewModelInstanceRuntime(vmi);
+                      runtime->ref();
+                      return runtime;
+                  }),
+                  allow_raw_pointers())
+        .function("hasFocusNodes", optional_override([](rive::StateMachineInstance& self) -> bool {
+                      return self.hasFocusNodes();
+                  }))
+        .function("focusNext", optional_override([](rive::StateMachineInstance& self) -> bool {
+                      return self.focusNext();
+                  }))
+        .function("focusPrevious", optional_override([](rive::StateMachineInstance& self) -> bool {
+                      return self.focusPrevious();
+                  }))
+        .function("clearFocus", optional_override([](rive::StateMachineInstance& self) -> void {
+                      return self.clearFocus();
+                  }))
+        .function("focusState",
+                  optional_override([](rive::StateMachineInstance& self) -> emscripten::val {
+                      auto state = self.focusState();
+                      auto obj = emscripten::val::object();
+                      obj.set("hasFocus", state.hasFocus);
+                      obj.set("expectsKeyboardInput", state.expectsKeyboardInput);
+                      return obj;
+                  }))
+        .function("enableSemantics", optional_override([](rive::StateMachineInstance& self) {
+                      self.enableSemantics();
+                  }))
+        .function("drainSemanticsDiff",
+                  optional_override([](rive::StateMachineInstance& self) -> emscripten::val {
+                      auto* manager = self.semanticManager();
+                      if (manager == nullptr)
+                      {
+                          return emscripten::val::null();
+                      }
+                      auto diff = manager->drainDiff();
+                      if (diff.empty())
+                      {
+                          return emscripten::val::null();
+                      }
+                      return semanticsDiffToVal(diff);
+                  }))
+        .function("fireSemanticAction",
+                  optional_override(
+                      [](rive::StateMachineInstance& self, uint32_t nodeId, uint8_t actionType) {
+                          self.fireSemanticAction(
+                              nodeId,
+                              static_cast<rive::SemanticActionType>(actionType));
+                      }))
+        .function("focusSemanticNode",
+                  optional_override([](rive::StateMachineInstance& self, uint32_t nodeId) -> bool {
+                      auto* manager = self.semanticManager();
+                      if (manager == nullptr)
+                      {
+                          return false;
+                      }
+                      return manager->requestFocus(nodeId);
                   }));
 
     class_<rive::SMIInput>("SMIInput")
@@ -1076,6 +1338,12 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
                   select_overload<void(float)>(&rive::SMINumber::value));
     class_<rive::SMITrigger, base<rive::SMIInput>>("SMITrigger")
         .function("fire", &rive::SMITrigger::fire);
+
+    enum_<rive::SurfaceMaterial>("SurfaceMaterial")
+        .value("None", rive::SurfaceMaterial::none)
+        .value("Inherit", rive::SurfaceMaterial::inherit)
+        .value("Rainbow", rive::SurfaceMaterial::rainbow)
+        .value("Gold", rive::SurfaceMaterial::gold);
 
     enum_<rive::Fit>("Fit")
         .value("fill", rive::Fit::fill)
@@ -1240,6 +1508,13 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
                           return self.propertyImage(path);
                       }),
                   allow_raw_pointers())
+        .function("font",
+                  optional_override(
+                      [](const rive::ViewModelInstanceRuntime& self,
+                         const std::string& path) -> rive::ViewModelInstanceAssetFontRuntime* {
+                          return self.propertyFont(path);
+                      }),
+                  allow_raw_pointers())
         .function("artboard",
                   optional_override(
                       [](const rive::ViewModelInstanceRuntime& self,
@@ -1252,6 +1527,11 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
                                        const std::string& path,
                                        rive::ViewModelInstanceRuntime* value) -> bool {
                       return self.replaceViewModel(path, value);
+                  }),
+                  allow_raw_pointers())
+        .function("getViewModelName",
+                  optional_override([](rive::ViewModelInstanceRuntime& self) -> std::string {
+                      return self.viewModelName();
                   }),
                   allow_raw_pointers())
         .function("incrementReferenceCount",
@@ -1392,6 +1672,16 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
             "value",
             optional_override([](rive::ViewModelInstanceAssetImageRuntime& self,
                                  rive::RenderImage* renderImage) { self.value(renderImage); }),
+            allow_raw_pointers())
+        .function("setSurfaceMaterial",
+                  &rive::ViewModelInstanceAssetImageRuntime::setSurfaceMaterial);
+    class_<rive::ViewModelInstanceAssetFontRuntime, base<rive::ViewModelInstanceValueRuntime>>(
+        "ViewModelInstanceAssetFont")
+        .function(
+            "value",
+            optional_override([](rive::ViewModelInstanceAssetFontRuntime& self, FontWrapper* font) {
+                self.value(font != nullptr ? font->font().get() : nullptr);
+            }),
             allow_raw_pointers());
     class_<rive::ViewModelInstanceArtboardRuntime, base<rive::ViewModelInstanceValueRuntime>>(
         "ViewModelInstanceArtboard")

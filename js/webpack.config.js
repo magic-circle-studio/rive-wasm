@@ -1,4 +1,5 @@
 const path = require("path");
+const webpack = require("webpack");
 const FileManagerPlugin = require("filemanager-webpack-plugin");
 
 // This file contains various different webpack configurations for the high
@@ -10,6 +11,13 @@ const canvas = {
   entry: "./src/rive.ts",
   target: "web",
   module: {
+    // RuntimeLoader supplies locateFile, so never asset-resolve the glue's
+    // default wasm URL.
+    parser: {
+      javascript: {
+        url: false,
+      },
+    },
     rules: [
       {
         test: /\.ts$/,
@@ -42,6 +50,11 @@ const canvas = {
   devtool: "source-map",
   mode: "none",
   plugins: [
+    // import.meta is a syntax error under classic <script> which some devs use today.
+    new webpack.DefinePlugin({
+      "import.meta.url":
+        "(typeof self !== 'undefined' && self.location ? self.location.href : '')",
+    }),
     new FileManagerPlugin({
       events: {
         onEnd: {
@@ -56,6 +69,21 @@ const canvas = {
                 __dirname,
                 "npm/canvas/rive_advanced.mjs.d.ts"
               ),
+            },
+            {
+              source: "build/src/runtimeLoader.d.ts",
+              destination: path.resolve(
+                __dirname,
+                "npm/canvas/runtimeLoader.d.ts"
+              ),
+            },
+            {
+              source: "build/src/utils",
+              destination: path.resolve(__dirname, "npm/canvas/utils"),
+            },
+            {
+              source: "build/src/semantics",
+              destination: path.resolve(__dirname, "npm/canvas/semantics"),
             },
           ],
         },
@@ -85,6 +113,10 @@ const canvasLite = {
     path: path.resolve(__dirname, "npm/canvas_lite"),
   },
   plugins: [
+    new webpack.DefinePlugin({
+      "import.meta.url":
+        "(typeof self !== 'undefined' && self.location ? self.location.href : '')",
+    }),
     new FileManagerPlugin({
       events: {
         onEnd: {
@@ -100,6 +132,21 @@ const canvasLite = {
                 "npm/canvas_lite/rive_advanced.mjs.d.ts"
               ),
             },
+            {
+              source: "build/src/runtimeLoader.d.ts",
+              destination: path.resolve(
+                __dirname,
+                "npm/canvas_lite/runtimeLoader.d.ts"
+              ),
+            },
+            {
+              source: "build/src/utils",
+              destination: path.resolve(__dirname, "npm/canvas_lite/utils"),
+            },
+            {
+              source: "build/src/semantics",
+              destination: path.resolve(__dirname, "npm/canvas_lite/semantics"),
+            },
           ],
         },
       },
@@ -113,6 +160,11 @@ const canvasSingle = {
   entry: "./src/rive.ts",
   target: "web",
   module: {
+    parser: {
+      javascript: {
+        url: false,
+      },
+    },
     rules: [
       {
         test: /\.ts$/,
@@ -145,6 +197,10 @@ const canvasSingle = {
   devtool: "source-map",
   mode: "none",
   plugins: [
+    new webpack.DefinePlugin({
+      "import.meta.url":
+        "(typeof self !== 'undefined' && self.location ? self.location.href : '')",
+    }),
     new FileManagerPlugin({
       events: {
         onEnd: {
@@ -163,186 +219,22 @@ const canvasSingle = {
                 "npm/canvas_single/rive_advanced.mjs.d.ts"
               ),
             },
-          ],
-        },
-      },
-    }),
-  ],
-  watchOptions: {
-    ignored: ["**/node_modules", "**/npm"],
-  },
-};
-
-/**
- * We're creating a local package for high-level js/single+lite version. We won't publish
- * this pacakge, but we'll retain it for testing purposes, since the high-level example apps
- * use the *-single variant versions of the web runtime
- */
-const canvasLiteSingle = {
-  ...canvasSingle,
-  resolve: {
-    ...canvasSingle.resolve,
-    alias: {
-      "./rive_advanced.mjs": path.resolve(
-        __dirname,
-        "../wasm/build/canvas_advanced_lite_single/bin/release/canvas_advanced_single.mjs"
-      ),
-      "package.json": path.resolve(__dirname, "npm/canvas_single/package.json"),
-    },
-  },
-  output: {
-    ...canvasSingle.output,
-    path: path.resolve(__dirname, "build/npm/canvas_lite_single"),
-  },
-  plugins: [
-    new FileManagerPlugin({
-      events: {
-        onEnd: {
-          copy: [
             {
-              source: "build/src/rive.d.ts",
+              source: "build/src/runtimeLoader.d.ts",
               destination: path.resolve(
                 __dirname,
-                "build/npm/canvas_lite_single/rive.d.ts"
+                "npm/canvas_single/runtimeLoader.d.ts"
               ),
             },
             {
-              source: "src/rive_advanced.mjs.d.ts",
-              destination: path.resolve(
-                __dirname,
-                "build/npm/canvas_lite_single/rive_advanced.mjs.d.ts"
-              ),
+              source: "build/src/utils",
+              destination: path.resolve(__dirname, "npm/canvas_single/utils"),
             },
             {
-              source: "npm/canvas_single/package.json",
+              source: "build/src/semantics",
               destination: path.resolve(
                 __dirname,
-                "build/npm/canvas_lite_single/package.json"
-              ),
-            },
-          ],
-        },
-      },
-    }),
-  ],
-};
-
-// Uses webgl_advanced with an externally loaded wasm file.
-const webgl = {
-  entry: "./src/rive.ts",
-  target: "web",
-  module: {
-    rules: [
-      {
-        test: /\.ts$/,
-        use: "ts-loader",
-        exclude: /node_modules/,
-      },
-    ],
-  },
-  resolve: {
-    extensions: [".ts", ".js"],
-    fallback: {
-      "fs": false,
-      "path": false,
-    },
-    alias: {
-      "./rive_advanced.mjs": path.resolve(
-        __dirname,
-        "npm/webgl_advanced/webgl_advanced.mjs"
-      ),
-      "package.json": path.resolve(__dirname, "npm/webgl/package.json"),
-    },
-  },
-  output: {
-    path: path.resolve(__dirname, "npm/webgl"),
-    filename: "rive.js",
-    libraryTarget: "umd",
-    library: "rive",
-    globalObject: "this",
-  },
-  devtool: "source-map",
-  mode: "none",
-  plugins: [
-    new FileManagerPlugin({
-      events: {
-        onEnd: {
-          copy: [
-            {
-              source: "build/src/rive.d.ts",
-              destination: path.resolve(__dirname, "npm/webgl/rive.d.ts"),
-            },
-            {
-              source: "src/rive_advanced.mjs.d.ts",
-              destination: path.resolve(
-                __dirname,
-                "npm/webgl/rive_advanced.mjs.d.ts"
-              ),
-            },
-          ],
-        },
-      },
-    }),
-  ],
-  watchOptions: {
-    ignored: ["**/node_modules", "**/npm"],
-  },
-};
-
-// Uses webgl_advanced with a bundled wasm file for simplicity/no external wasm
-// loading.
-const webglSingle = {
-  entry: "./src/rive.ts",
-  target: "web",
-  module: {
-    rules: [
-      {
-        test: /\.ts$/,
-        use: "ts-loader",
-        exclude: /node_modules/,
-      },
-    ],
-  },
-  resolve: {
-    extensions: [".ts", ".js"],
-    fallback: {
-      "fs": false,
-      "path": false,
-    },
-    alias: {
-      "./rive_advanced.mjs": path.resolve(
-        __dirname,
-        "npm/webgl_advanced_single/webgl_advanced_single.mjs"
-      ),
-      "package.json": path.resolve(__dirname, "npm/webgl_single/package.json"),
-    },
-  },
-  output: {
-    path: path.resolve(__dirname, "npm/webgl_single"),
-    filename: "rive.js",
-    libraryTarget: "umd",
-    library: "rive",
-    globalObject: "this",
-  },
-  devtool: "source-map",
-  mode: "none",
-  plugins: [
-    new FileManagerPlugin({
-      events: {
-        onEnd: {
-          copy: [
-            {
-              source: "build/src/rive.d.ts",
-              destination: path.resolve(
-                __dirname,
-                "npm/webgl_single/rive.d.ts"
-              ),
-            },
-            {
-              source: "src/rive_advanced.mjs.d.ts",
-              destination: path.resolve(
-                __dirname,
-                "npm/webgl_single/rive_advanced.mjs.d.ts"
+                "npm/canvas_single/semantics"
               ),
             },
           ],
@@ -360,6 +252,11 @@ const webgl2 = {
   entry: "./src/rive.ts",
   target: "web",
   module: {
+    parser: {
+      javascript: {
+        url: false,
+      },
+    },
     rules: [
       {
         test: /\.ts$/,
@@ -392,6 +289,11 @@ const webgl2 = {
   devtool: "source-map",
   mode: "none",
   plugins: [
+    // import.meta is a syntax error under classic <script> which some devs use today.
+    new webpack.DefinePlugin({
+      "import.meta.url":
+        "(typeof self !== 'undefined' && self.location ? self.location.href : '')",
+    }),
     new FileManagerPlugin({
       events: {
         onEnd: {
@@ -407,6 +309,21 @@ const webgl2 = {
                 "npm/webgl2/rive_advanced.mjs.d.ts"
               ),
             },
+            {
+              source: "build/src/runtimeLoader.d.ts",
+              destination: path.resolve(
+                __dirname,
+                "npm/webgl2/runtimeLoader.d.ts"
+              ),
+            },
+            {
+              source: "build/src/utils",
+              destination: path.resolve(__dirname, "npm/webgl2/utils"),
+            },
+            {
+              source: "build/src/semantics",
+              destination: path.resolve(__dirname, "npm/webgl2/semantics"),
+            },
           ],
         },
       },
@@ -417,12 +334,26 @@ const webgl2 = {
   },
 };
 
-module.exports = [
-  canvasSingle,
-  canvasLiteSingle,
-  canvas,
-  canvasLite,
-  webglSingle,
-  webgl,
-  webgl2,
-];
+// Maps target names (passed via --env targets=... or npm run build:targets) to webpack configs.
+// Available targets: canvas, canvas-lite, canvas-single, webgl2
+const TARGET_CONFIGS = {
+  "canvas": canvas,
+  "canvas-lite": canvasLite,
+  "canvas-single": canvasSingle,
+  "webgl2": webgl2,
+};
+
+module.exports = (env = {}) => {
+  const targetList = env.targets
+    ? env.targets.split(",").map((t) => t.trim())
+    : null;
+
+  return targetList
+    ? targetList.map((t) => TARGET_CONFIGS[t]).filter(Boolean)
+    : [
+        canvasSingle,
+        canvas,
+        canvasLite,
+        webgl2,
+      ];
+};

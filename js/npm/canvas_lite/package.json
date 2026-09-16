@@ -1,6 +1,6 @@
 {
   "name": "@rive-app/canvas-lite",
-  "version": "2.35.2",
+  "version": "2.42.2",
   "description": "A lite version of Rive's canvas based web api.",
   "main": "rive.js",
   "homepage": "https://rive.app",
@@ -27,7 +27,10 @@
     "rive.wasm",
     "rive_fallback.wasm",
     "rive.d.ts",
-    "rive_advanced.mjs.d.ts"
+    "rive_advanced.mjs.d.ts",
+    "runtimeLoader.d.ts",
+    "utils",
+    "semantics"
   ],
   "typings": "rive.d.ts",
   "dependencies": {},

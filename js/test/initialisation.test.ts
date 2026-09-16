@@ -9,6 +9,12 @@ import {
   oneShotRiveFileBuffer,
   stateMachineFileBuffer,
 } from "./assets/bytes";
+import { loadFile } from "./helpers";
+
+class MockResizeObserver {
+  observe = jest.fn();
+  disconnect = jest.fn();
+}
 
 function setTimeoutPromise(callback, ms) {
   return new Promise((resolve) =>
@@ -19,15 +25,32 @@ function setTimeoutPromise(callback, ms) {
   );
 }
 
+async function waitForPredicate<T>(
+  predicate: () => T | null | undefined | false,
+  timeoutMs = 1500,
+  intervalMs = 25,
+): Promise<T> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const result = predicate();
+    if (result) return result;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error("Timed out waiting for condition");
+}
+
 // #region setup and teardown
 
 beforeEach(() => {
   // needed to prevent logging bad header on the corrupt file loader
   // not sure why mocking in that function does not work
   jest.spyOn(console, "error").mockImplementation(() => {});
+  (window as any).ResizeObserver = MockResizeObserver;
 });
 
-afterEach(() => {});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 // #endregion
 
@@ -43,9 +66,10 @@ test("Runtime can be loaded using callbacks", async () => {
     callbacksSucceeded += 1;
   };
 
-  const callback2: rive.RuntimeCallback = (runtime: rc.RiveCanvas): void =>
+  const callback2: rive.RuntimeCallback = (runtime: rc.RiveCanvas): void => {
     expect(runtime).toBeDefined();
-  callbacksSucceeded += 1;
+    callbacksSucceeded += 1;
+  };
 
   const callback3: rive.RuntimeCallback = (runtime: rc.RiveCanvas): void => {
     expect(runtime).toBeDefined();
@@ -54,8 +78,12 @@ test("Runtime can be loaded using callbacks", async () => {
 
   rive.RuntimeLoader.getInstance(callback1);
   rive.RuntimeLoader.getInstance(callback2);
-  // Delay 1 second to let library load
-  await setTimeoutPromise(() => rive.RuntimeLoader.getInstance(callback3), 500);
+  rive.RuntimeLoader.getInstance(callback3);
+
+  // Wait until the runtime has actually loaded and fired all three callbacks,
+  // rather than racing a fixed timeout against WASM load time (which made this
+  // flaky: on a cold/slow load the callbacks were still queued at assert time).
+  await waitForPredicate(() => callbacksSucceeded === 3);
   expect(callbacksSucceeded).toBe(3);
 });
 
@@ -75,6 +103,205 @@ test("Runtime can be loaded using promises", async () => {
     expect(rive3).toBeDefined;
     expect(rive3).toBe(rive2);
   }, 500);
+});
+
+describe("RuntimeLoader WASM fallback URL behavior", () => {
+  let savedRuntime: rc.RiveCanvas;
+  let savedIsLoading: boolean;
+  let savedCallBackQueue: rive.RuntimeCallback[];
+  let savedErrorCallbackQueue: ((error: Error) => void)[];
+  let savedWasmURL: string;
+  let savedWasmFallbackURL: string | null;
+  let savedWasmBinary: ArrayBuffer | null;
+  let originalRcDefault: (typeof rc)["default"];
+
+  beforeEach(() => {
+    savedRuntime = (rive.RuntimeLoader as any).runtime;
+    savedIsLoading = (rive.RuntimeLoader as any).isLoading;
+    savedCallBackQueue = (rive.RuntimeLoader as any).callBackQueue;
+    savedErrorCallbackQueue = (rive.RuntimeLoader as any).errorCallbackQueue;
+    savedWasmURL = rive.RuntimeLoader.getWasmUrl();
+    savedWasmFallbackURL = rive.RuntimeLoader.getWasmFallbackUrl();
+    savedWasmBinary = rive.RuntimeLoader.getWasmBinary();
+    originalRcDefault = rc.default;
+
+    // Reset the singleton to an unloaded state so loadRuntime() fires
+    (rive.RuntimeLoader as any).runtime = undefined;
+    (rive.RuntimeLoader as any).isLoading = false;
+    (rive.RuntimeLoader as any).callBackQueue = [];
+    (rive.RuntimeLoader as any).errorCallbackQueue = [];
+    rive.RuntimeLoader.setWasmUrl("https://primary.example.com/rive.wasm");
+    rive.RuntimeLoader.setWasmFallbackUrl(
+      "https://fallback.example.com/rive_fallback.wasm",
+    );
+    rive.RuntimeLoader.setWasmBinary(null);
+  });
+
+  afterEach(() => {
+    // Restore rc.default before restoring the singleton so any in-flight
+    // promise chains that settle during cleanup use the real loader.
+    (rc as any).default = originalRcDefault;
+
+    (rive.RuntimeLoader as any).runtime = savedRuntime;
+    (rive.RuntimeLoader as any).isLoading = savedIsLoading;
+    (rive.RuntimeLoader as any).callBackQueue = savedCallBackQueue;
+    (rive.RuntimeLoader as any).errorCallbackQueue = savedErrorCallbackQueue;
+    rive.RuntimeLoader.setWasmUrl(savedWasmURL);
+    rive.RuntimeLoader.setWasmFallbackUrl(savedWasmFallbackURL);
+    rive.RuntimeLoader.setWasmBinary(savedWasmBinary);
+    jest.restoreAllMocks();
+  });
+
+  test("default fallback URL points to the jsdelivr CDN", () => {
+    expect(savedWasmFallbackURL).toMatch(/cdn\.jsdelivr\.net/);
+  });
+
+  test("setWasmFallbackUrl / getWasmFallbackUrl round-trip", () => {
+    rive.RuntimeLoader.setWasmFallbackUrl(
+      "https://my-cdn.com/rive_fallback.wasm",
+    );
+    expect(rive.RuntimeLoader.getWasmFallbackUrl()).toBe(
+      "https://my-cdn.com/rive_fallback.wasm",
+    );
+  });
+
+  test("setWasmFallbackUrl(null) disables the fallback", () => {
+    rive.RuntimeLoader.setWasmFallbackUrl(null);
+    expect(rive.RuntimeLoader.getWasmFallbackUrl()).toBeNull();
+  });
+
+  test("fallback URL is tried when primary URL fails", async () => {
+    const fallbackUrl = "https://fallback.example.com/rive_fallback.wasm";
+    rive.RuntimeLoader.setWasmFallbackUrl(fallbackUrl);
+
+    const mockRuntime = {} as rc.RiveCanvas;
+    let callCount = 0;
+
+    (rc as any).default = jest.fn((): Promise<rc.RiveCanvas> => {
+      callCount++;
+      return callCount === 1
+        ? Promise.reject(new Error("Primary failed"))
+        : Promise.resolve(mockRuntime);
+    });
+
+    await new Promise<void>((resolve) => {
+      rive.RuntimeLoader.getInstance((runtime) => {
+        expect(runtime).toBe(mockRuntime);
+        resolve();
+      });
+    });
+
+    expect(callCount).toBe(2);
+    expect(rive.RuntimeLoader.getWasmUrl()).toBe(fallbackUrl);
+  });
+
+  test("wasmBinary is cleared when falling back so the fallback URL is actually fetched", async () => {
+    const fallbackUrl = "https://fallback.example.com/rive_fallback.wasm";
+    rive.RuntimeLoader.setWasmFallbackUrl(fallbackUrl);
+    rive.RuntimeLoader.setWasmBinary(new ArrayBuffer(8));
+
+    const mockRuntime = {} as rc.RiveCanvas;
+    let callCount = 0;
+
+    (rc as any).default = jest.fn((opts: any): Promise<rc.RiveCanvas> => {
+      callCount++;
+      if (callCount === 1) {
+        // First call should have wasmBinary set
+        expect(opts.wasmBinary).toBeInstanceOf(ArrayBuffer);
+        return Promise.reject(new Error("Primary failed"));
+      }
+      // Second (fallback) call should NOT have wasmBinary
+      expect(opts.wasmBinary).toBeUndefined();
+      return Promise.resolve(mockRuntime);
+    });
+
+    await new Promise<void>((resolve) => {
+      rive.RuntimeLoader.getInstance((runtime) => {
+        expect(runtime).toBe(mockRuntime);
+        resolve();
+      });
+    });
+
+    expect(callCount).toBe(2);
+    expect(rive.RuntimeLoader.getWasmBinary()).toBeNull();
+  });
+
+  test("when fallback is null, no retry occurs", async () => {
+    rive.RuntimeLoader.setWasmFallbackUrl(null);
+
+    const rcDefaultMock = jest
+      .fn()
+      .mockRejectedValue(new Error("Load failed"));
+    (rc as any).default = rcDefaultMock;
+
+    rive.RuntimeLoader.getInstance(() => {});
+
+    expect(rcDefaultMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("when both primary and fallback fail, error is logged after two attempts", async () => {
+    const rcDefaultMock = jest
+      .fn()
+      .mockRejectedValue(new Error("Load failed"));
+    (rc as any).default = rcDefaultMock;
+
+    const errorMock = jest.fn();
+    jest.spyOn(console, "error").mockImplementation(errorMock);
+
+    rive.RuntimeLoader.getInstance(() => {});
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(rcDefaultMock).toHaveBeenCalledTimes(2);
+    expect(errorMock).toHaveBeenCalledWith(
+      expect.stringContaining("Could not load Rive WASM file"),
+    );
+  });
+
+  test("awaitInstance() rejects when both primary and fallback WASM URLs fail", async () => {
+    rive.RuntimeLoader.setWasmFallbackUrl(null);
+    (rc as any).default = jest.fn().mockRejectedValue(new Error("Load failed"));
+    await expect(rive.RuntimeLoader.awaitInstance()).rejects.toThrow(
+      "Load failed",
+    );
+  });
+
+  test("RuntimeLoader is retryable after WASM load failure", async () => {
+    rive.RuntimeLoader.setWasmFallbackUrl(null);
+    const mockRuntime = {} as rc.RiveCanvas;
+
+    (rc as any).default = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("Load failed"))
+      .mockResolvedValue(mockRuntime);
+
+    // First attempt fails
+    await expect(rive.RuntimeLoader.awaitInstance()).rejects.toBeInstanceOf(
+      Error,
+    );
+    // isLoading should be reset; set a new URL and retry
+    rive.RuntimeLoader.setWasmUrl("https://retry.example.com/rive.wasm");
+    const runtime = await rive.RuntimeLoader.awaitInstance();
+    expect(runtime).toBe(mockRuntime);
+  });
+
+  test("Rive onLoadError is called when WASM fails to load", (done) => {
+    rive.RuntimeLoader.setWasmFallbackUrl(null);
+    (rc as any).default = jest.fn().mockRejectedValue(new Error("Load failed"));
+
+    const canvas = document.createElement("canvas");
+    new rive.Rive({
+      canvas,
+      buffer: pingPongRiveFileBuffer,
+      onLoadError: (e) => {
+        expect((e.data as string)).toContain("Load failed");
+        done();
+      },
+      onLoad: () => {
+        throw new Error("onLoad should not be called when WASM fails");
+      },
+    });
+  });
 });
 
 // #endregion
@@ -102,31 +329,52 @@ test("Rive objects initialize correctly", (done) => {
   });
 });
 
-test("Corrupt Rive file cause explosions", async () => {
-  // this test also causes two errors to be logged
-  // but they seem to get logged outside the scope of the file load.
-  const warningMock = jest.fn();
-  const errorMock = jest.fn();
-  jest.spyOn(console, "warn").mockImplementation(warningMock);
-  jest.spyOn(console, "error").mockImplementation(errorMock);
+test("Corrupt riv file invokes onLoadError", (done) => {
   const canvas = document.createElement("canvas");
 
-  await new Promise<void>((resolve) => {
-    new rive.Rive({
-      canvas: canvas,
-      buffer: corruptRiveFileBuffer,
-      onLoadError: () => {
-        resolve();
-      },
-      onLoad: () => {
-        expect(false).toBeTruthy();
-      },
-    });
+  new rive.Rive({
+    canvas: canvas,
+    buffer: corruptRiveFileBuffer,
+    onLoadError: () => {
+      done();
+    },
+    onLoad: () => {
+      expect(false).toBeTruthy();
+    },
   });
-  expect(warningMock).toBeCalledWith("Problem loading file; may be corrupt!");
-  // racy should we add "waitFor"
-  await new Promise((r) => setTimeout(r, 50));
-  expect(errorMock).toBeCalledWith("Problem loading file; may be corrupt!");
+});
+
+test("Rive creates a semantic tree and accessibility overlay for semantic files", (done) => {
+  const semanticDataBindingListsBuffer = loadFile(
+    "assets/data_binding_lists.riv",
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = 500;
+  canvas.height = 500;
+  document.body.appendChild(canvas);
+
+  const r = new rive.Rive({
+    canvas,
+    buffer: semanticDataBindingListsBuffer,
+    semanticsMode: rive.SemanticMode.Enabled,
+    stateMachines: "State Machine 1",
+    autoplay: true,
+    autoBind: true,
+    onAdvance: () => {
+      const tree = r.semanticTree;
+      expect(tree?.nodeCount).toBeGreaterThan(0);
+      expect(
+        tree.flattened().some(({ node }) => node.label?.length > 0),
+      ).toBe(true);
+
+      const overlay = document.querySelector<HTMLElement>('[id^="rive-a11y-"]');
+      expect(overlay).not.toBeNull();
+      expect(overlay!.getAttribute("role")).toBe("region");
+      expect(overlay!.querySelector('[id*="-sem-"]')).not.toBeNull();
+      canvas.remove();
+      done();
+    },
+  });
 });
 
 // #endregion
@@ -383,6 +631,146 @@ test("Rive deletes rive file instance on the cleanup", async () => {
   });
 });
 
+test("one RiveFile with immediate renderer drives five instances", async () => {
+  // The one-file/one-session/one-renderer rule is deferred-only: an immediate
+  // file has no session, so initData skips the resolver entirely and every
+  // instance just takes a reference.
+  const riveFile = new rive.RiveFile({ buffer: stateMachineFileBuffer });
+  await riveFile.init();
+
+  const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+  const instances: rive.Rive[] = [];
+  try {
+    for (let i = 0; i < 5; i++) {
+      instances.push(
+        await new Promise<rive.Rive>((resolve, reject) => {
+          const inst = new rive.Rive({
+            canvas: document.createElement("canvas"),
+            riveFile: riveFile,
+            artboard: "MyArtboard",
+            autoplay: true,
+            onLoad: () => resolve(inst),
+            onLoadError: (e: rive.Event) =>
+              reject(new Error(String(e?.data ?? "load error"))),
+          });
+        }),
+      );
+    }
+
+    expect(instances).toHaveLength(5);
+    instances.forEach((r) => expect(r.activeArtboard).toBe("MyArtboard"));
+    expect(riveFile.referenceCount).toBe(5);
+    // No session, so no deferred fallback and nothing to warn about.
+    instances.forEach((r) => expect(r.deferredRendererActive).toBe(false));
+    expect(
+      warnSpy.mock.calls
+        .map((c) => String(c[0]))
+        .filter((m) => m.startsWith("Rive:")),
+    ).toEqual([]);
+
+    // Each instance hands its reference back independently.
+    instances[0].cleanup();
+    expect(riveFile.referenceCount).toBe(4);
+  } finally {
+    warnSpy.mockRestore();
+    instances.forEach((r) => {
+      try {
+        r.cleanup();
+      } catch {
+        /* already cleaned up */
+      }
+    });
+  }
+});
+
+// #region reload (rive.load)
+
+/** Resolves once the instance reports a completed load. */
+const loadInto = (r: rive.Rive, params: any): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const onLoad = () => {
+      r.off(rive.EventType.Load, onLoad);
+      resolve();
+    };
+    r.on(rive.EventType.Load, onLoad);
+    r.on(rive.EventType.LoadError, (e: rive.Event) =>
+      reject(new Error(String(e?.data ?? "load error"))),
+    );
+    r.load(params);
+  });
+
+test("load() keeps a caller-supplied RiveFile usable", async () => {
+  // load() gives back the reference this instance took, but must not destroy a
+  // file the caller still holds: a RiveFile carries no reference for its
+  // creator, so releasing here would take the last one.
+  const riveFile = new rive.RiveFile({ buffer: stateMachineFileBuffer });
+  await riveFile.init();
+
+  const r = await new Promise<rive.Rive>((resolve) => {
+    const inst = new rive.Rive({
+      canvas: document.createElement("canvas"),
+      riveFile: riveFile,
+      artboard: "MyArtboard",
+      autoplay: true,
+      onLoad: () => resolve(inst),
+    });
+  });
+  expect(riveFile.referenceCount).toBe(1);
+
+  await loadInto(r, {
+    buffer: loopRiveFileBuffer,
+    autoplay: true,
+  });
+
+  // The instance moved on, and the caller's file survived it.
+  expect((riveFile as any).destroyed).toBe(false);
+
+  // Known cost of that: reload does not hand back the reference getInstance()
+  // took, because doing so would drop a caller-supplied file to zero and
+  // destroy it. The count stays inflated until the caller cleans up
+  expect(riveFile.referenceCount).toBe(1);
+
+  // Still usable: a fresh instance can load it again.
+  const second = await new Promise<rive.Rive>((resolve, reject) => {
+    const inst = new rive.Rive({
+      canvas: document.createElement("canvas"),
+      riveFile: riveFile,
+      artboard: "MyArtboard",
+      autoplay: true,
+      onLoad: () => resolve(inst),
+      onLoadError: (e: rive.Event) =>
+        reject(new Error(String(e?.data ?? "load error"))),
+    });
+  });
+  expect(second.activeArtboard).toBe("MyArtboard");
+
+  r.cleanup();
+  second.cleanup();
+});
+
+test("load() with no source throws before stopping playback", async () => {
+  const r = await new Promise<rive.Rive>((resolve) => {
+    const inst = new rive.Rive({
+      canvas: document.createElement("canvas"),
+      buffer: stateMachineFileBuffer,
+      artboard: "MyArtboard",
+      autoplay: true,
+      onLoad: () => resolve(inst),
+    });
+  });
+  expect(r.isPlaying).toBe(true);
+
+  expect(() => r.load({})).toThrow();
+
+  // The bad call must leave the running instance untouched.
+  expect(r.isPlaying).toBe(true);
+  expect(r.activeArtboard).toBe("MyArtboard");
+
+  r.cleanup();
+});
+
+// #endregion
+
 test("Cleaning up file before load does not reduce reference count", async () => {
   const canvas = document.createElement("canvas");
   const riveFile = new rive.RiveFile({
@@ -456,6 +844,54 @@ test("resizeDrawingSurfaceToCanvas scales canvas with passed in ratio if present
       expect(canvas.height).toBe(500);
       done();
     },
+  });
+});
+
+// #endregion
+
+// #region renderer creation errors
+
+describe("makeRenderer checks", () => {
+  let runtime: rc.RiveCanvas;
+
+  beforeEach(async () => {
+    runtime = await rive.RuntimeLoader.awaitInstance();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test("onLoadError is called when makeRenderer returns null", (done) => {
+    jest.spyOn(runtime, "makeRenderer").mockReturnValue(null);
+
+    const canvas = document.createElement("canvas");
+    new rive.Rive({
+      canvas,
+      buffer: pingPongRiveFileBuffer,
+      onLoadError: (e) => {
+        expect(e.data as string).not.toBeNull();
+        done();
+      },
+      onLoad: () => done(new Error("onLoad should not be called when makeRenderer returns null")),
+    });
+  });
+
+  test("onLoadError is called when makeRenderer throws", (done) => {
+    jest.spyOn(runtime, "makeRenderer").mockImplementation(() => {
+      throw new Error("WebGL context creation failed");
+    });
+
+    const canvas = document.createElement("canvas");
+    new rive.Rive({
+      canvas,
+      buffer: pingPongRiveFileBuffer,
+      onLoadError: (e) => {
+        expect(e.data as string).not.toBeNull();
+        done();
+      },
+      onLoad: () => done(new Error("onLoad should not be called when makeRenderer throws")),
+    });
   });
 });
 

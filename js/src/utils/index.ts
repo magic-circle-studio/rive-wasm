@@ -1,4 +1,6 @@
 export { registerTouchInteractions } from "./registerTouchInteractions";
+export { KeyboardInteractions, FocusSessionState } from "./registerKeyboardInteractions";
+export type { KeyboardInteractionsParams } from "./registerKeyboardInteractions";
 export { BLANK_URL, sanitizeUrl } from "./sanitizeUrl";
 export {
   Finalizable,
@@ -15,3 +17,4 @@ export {
   FileFinalizer,
   createFinalization,
 } from "./finalizationRegistry";
+export { RiveFont } from "./riveFont";
