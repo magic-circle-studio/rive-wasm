@@ -238,12 +238,55 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         imageBinding.setSurfaceMaterial(rive.SurfaceMaterial.None);
         imageBinding.setSurfaceMaterial(rive.SurfaceMaterial.Rainbow);
         imageBinding.setSurfaceMaterial(rive.SurfaceMaterial.Inherit);
+
+        const gl = canvas.getContext("webgl2");
+        assert(gl, "WebGL2 is unavailable in the test browser.");
+
+        // Exercise decode fallbacks and deletion before any texture upload.
+        const sourceCanvas = new OffscreenCanvas(32, 32);
+        const sourceContext = sourceCanvas.getContext("2d");
+        sourceContext.fillStyle = "#e0308080";
+        sourceContext.fillRect(0, 0, 32, 32);
+        const png = new Uint8Array(await (await sourceCanvas.convertToBlob()).arrayBuffer());
+        const originalCreateImageBitmap = globalThis.createImageBitmap;
+        try {
+          for (const mode of ["bitmap", "unavailable", "rejected"]) {
+            let bitmapDecode;
+            globalThis.createImageBitmap = mode === "bitmap"
+              ? (...args) => (bitmapDecode = originalCreateImageBitmap(...args))
+              : mode === "unavailable"
+                ? undefined
+                : () => Promise.reject(new Error("Test bitmap decode failure"));
+            const previous = new Set(rive.imageBitmaps?.values());
+            const decoded = await new Promise((resolve) => rive.decodeImage(png, resolve));
+            // decodeImage returns the handle before its browser decode ends.
+            await Promise.all(Array.from(rive.images.values(), (image) =>
+              image.complete ? Promise.resolve() : new Promise((resolve) =>
+                image.addEventListener("load", resolve, { once: true }),
+              ),
+            ));
+            await bitmapDecode;
+            const pending = Array.from(rive.imageBitmaps?.values() ?? [])
+              .filter((bitmap) => !previous.has(bitmap));
+            assert(
+              pending.length === (mode === "bitmap" ? 1 : 0),
+              "Unexpected pending bitmap count: " + mode,
+            );
+            assert(pending.every((bitmap) => bitmap.width === 32), "Bitmap closed before use.");
+            decoded.unref();
+            assert(pending.every((bitmap) => bitmap.width === 0), "Deleting an unused image leaked its bitmap.");
+            assert(
+              pending.every((bitmap) => !Array.from(rive.imageBitmaps.values()).includes(bitmap)),
+              "Deleted image retained its bitmap in the runtime.",
+            );
+          }
+        } finally {
+          globalThis.createImageBitmap = originalCreateImageBitmap;
+        }
         imageBindingInstance.delete();
         imageBindingArtboard.delete();
         imageBindingFile.unref();
 
-        const gl = canvas.getContext("webgl2");
-        assert(gl, "WebGL2 is unavailable in the test browser.");
         const fixtureBytes = new Uint8Array(await (await fetch("/fixture.riv")).arrayBuffer());
         const file = await rive.load(fixtureBytes);
         const artboard = ${JSON.stringify(artboardName)}
