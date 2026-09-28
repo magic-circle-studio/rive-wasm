@@ -169,11 +169,50 @@ EM_JS(void, decode_image, (uintptr_t renderImage, uintptr_t imgDataPtr, int imgD
     var sourceView = Module["HEAP8"].subarray(imgDataPtr, imgDataPtr + imgDataLength);
     var buffer = new Uint8Array(imgDataLength);
     buffer.set(sourceView);
-    image.src = URL.createObjectURL(new Blob([buffer], {
+    var blob = new Blob([buffer], {
         type:
             "image/png"
-    }));
-    image.onload = function() { Module["_setWebImage"](renderImage, image.width, image.height); };
+    });
+    // Decode before the first upload so texImage2D does not synchronously
+    // decode the HTMLImageElement. Keep the element for later GL contexts.
+    // WebGL ignores UNPACK_PREMULTIPLY_ALPHA_WEBGL for ImageBitmaps.
+    var bitmapPromise = typeof createImageBitmap === "function"
+        ? createImageBitmap(blob, { premultiplyAlpha: "premultiply" }).catch(function() { return null; })
+        : Promise.resolve(null);
+    var objectUrl = URL.createObjectURL(blob);
+    image["decodePromise"] = new Promise(function(resolve) {
+        image.onload = function() {
+            URL.revokeObjectURL(objectUrl);
+            bitmapPromise.then(function(bitmap) {
+                if (bitmap)
+                {
+                    var bitmaps = Module["imageBitmaps"];
+                    if (!bitmaps)
+                    {
+                        bitmaps = new Map();
+                        Module["imageBitmaps"] = bitmaps;
+                    }
+                    bitmaps.set(renderImage, bitmap);
+                }
+                // The constructor's decode ref keeps renderImage alive until
+                // _setWebImage releases it, even if its caller already left.
+                Module["_setWebImage"](renderImage, image.width, image.height);
+                resolve(true);
+            });
+        };
+        image.onerror = function() {
+            URL.revokeObjectURL(objectUrl);
+            bitmapPromise.then(function(bitmap) {
+                if (bitmap)
+                {
+                    bitmap.close();
+                }
+                Module["_setWebImage"](renderImage, 0, 0);
+                resolve(false);
+            });
+        };
+    });
+    image.src = objectUrl;
 });
 
 EM_JS(void, upload_image, (EMSCRIPTEN_WEBGL_CONTEXT_HANDLE gl, uintptr_t renderImage), {
@@ -188,10 +227,17 @@ EM_JS(void, upload_image, (EMSCRIPTEN_WEBGL_CONTEXT_HANDLE gl, uintptr_t renderI
     {
         return;
     }
+    var bitmaps = Module["imageBitmaps"];
+    var bitmap = bitmaps && bitmaps.get(renderImage);
     gl = GL.getContext(gl).GLctx;
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap || image);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    if (bitmap)
+    {
+        bitmap.close();
+        bitmaps.delete(renderImage);
+    }
 });
 
 EM_JS(void, delete_image, (uintptr_t renderImage), {
@@ -207,6 +253,13 @@ EM_JS(void, delete_image, (uintptr_t renderImage), {
         return;
     }
     images.delete(renderImage);
+    var bitmaps = Module["imageBitmaps"];
+    var bitmap = bitmaps && bitmaps.get(renderImage);
+    if (bitmap)
+    {
+        bitmap.close();
+        bitmaps.delete(renderImage);
+    }
 });
 
 // High-level, context agnostic RenderImage for the WebGL2 system. Wraps a blob of encoded image
@@ -245,7 +298,7 @@ public:
     {
         m_Width = width;
         m_Height = height;
-        m_readyToUpload = true;
+        m_readyToUpload = width > 0 && height > 0;
         decodedAsync();
     }
 
@@ -1224,6 +1277,14 @@ class RenderImageWrapper : public wrapper<RenderImage>
 public:
     EMSCRIPTEN_WRAPPER(RenderImageWrapper);
     void unref() { RenderImage::unref(); }
+
+    // Encoded WebGL2 images register their completion before returning from
+    // construction. Keep this internal: texture-backed images need no decode.
+    emscripten::val decodePromise()
+    {
+        return emscripten::val::module_property("images")
+            .call<emscripten::val>("get", reinterpret_cast<uintptr_t>(this))["decodePromise"];
+    }
 };
 
 RenderImageWrapper* WebGL2Renderer::makeImageFromGLTexture(
@@ -1296,6 +1357,7 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
                   allow_raw_pointers());
     class_<RenderImage>("RenderImage")
         .function("unref", &RenderImageWrapper::unref)
+        .function("_decodePromise", &RenderImageWrapper::decodePromise)
         .allow_subclass<RenderImageWrapper>("RenderImageWrapper");
 
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)

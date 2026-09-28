@@ -3,7 +3,7 @@
 This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
 official `rive-wasm` `2.42.2` tag (`dc4d3a12`) and the matching
 `rive-runtime` `runtime-v0.1.411` tag (`30742b4c`). The package version is
-`2.42.2-mc.1`. Both repositories replay the Magic Circle changes on these
+`2.42.2-mc.3`. Both repositories replay the Magic Circle changes on these
 upstream bases; the runtime submodule points to the Magic Circle mirror.
 
 The fork adds:
@@ -12,8 +12,18 @@ The fork adds:
 - rendering into a caller-owned immutable WebGL texture;
 - wrapping a WebGL texture as a Rive image;
 - deformation-aware animated/static Gold and static Rainbow materials;
-- per-image material overrides and worker-safe OffscreenCanvas creation; and
-- a generated JavaScript export of the same material shader source.
+- per-image material overrides and worker-safe OffscreenCanvas creation;
+- a generated JavaScript export of the same material shader source; and
+- asynchronous ImageBitmap decoding before the first image upload, with
+  premultiplied alpha, bitmap cleanup, and an HTMLImageElement fallback for
+  later contexts or browsers that cannot decode a bitmap.
+
+`2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
+decoding before invoking `decodeImage`'s callback, reports invalid images as
+`null`, and releases Blob URLs and native decode references on failure.
+The image-element fallback preserves the upstream runtime's multi-context
+contract; Magic Circle's current renderer sessions do not share images
+across contexts.
 
 ## Build
 
@@ -57,7 +67,9 @@ The test creates an npm tarball, installs that exact tarball into a temporary
 project, starts a local server, and drives real WebGL2 in headless Chrome. It
 checks both WASM variants with the same JS loader: public fork APIs,
 normal/Gold/Rainbow rendering, external render targets, overlay preservation,
-texture-backed images, and teardown. Set `CHROME_BIN` if Chrome is not on PATH.
+texture-backed images, decode readiness and failures, Blob URL and bitmap
+cleanup, matching image uploads across two GL contexts, and teardown.
+Set `CHROME_BIN` if Chrome is not on PATH.
 Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 `RIVE_TEST_WASM` optionally restricts the binary under test.
 
