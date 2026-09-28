@@ -187,11 +187,12 @@ EM_JS(void, decode_image, (uintptr_t renderImage, uintptr_t imgDataPtr, int imgD
     var bitmapPromise = typeof createImageBitmap === "function"
         ? createImageBitmap(blob, { premultiplyAlpha: "premultiply" }).catch(function() { return null; })
         : Promise.resolve(null);
-    image.onload = function() {
-        bitmapPromise.then(function(bitmap) {
-            if (bitmap)
-            {
-                if (images.get(renderImage) === image)
+    var objectUrl = URL.createObjectURL(blob);
+    image["decodePromise"] = new Promise(function(resolve) {
+        image.onload = function() {
+            URL.revokeObjectURL(objectUrl);
+            bitmapPromise.then(function(bitmap) {
+                if (bitmap)
                 {
                     var bitmaps = Module["imageBitmaps"];
                     if (!bitmaps)
@@ -201,23 +202,25 @@ EM_JS(void, decode_image, (uintptr_t renderImage, uintptr_t imgDataPtr, int imgD
                     }
                     bitmaps.set(renderImage, bitmap);
                 }
-                else
+                // The constructor's decode ref keeps renderImage alive until
+                // _setWebImage releases it, even if its caller already left.
+                Module["_setWebImage"](renderImage, image.width, image.height);
+                resolve(true);
+            });
+        };
+        image.onerror = function() {
+            URL.revokeObjectURL(objectUrl);
+            bitmapPromise.then(function(bitmap) {
+                if (bitmap)
                 {
                     bitmap.close();
                 }
-            }
-            Module["_setWebImage"](renderImage, image.width, image.height);
-        });
-    };
-    image.onerror = function() {
-        bitmapPromise.then(function(bitmap) {
-            if (bitmap)
-            {
-                bitmap.close();
-            }
-        });
-    };
-    image.src = URL.createObjectURL(blob);
+                Module["_setWebImage"](renderImage, 0, 0);
+                resolve(false);
+            });
+        };
+    });
+    image.src = objectUrl;
 });
 
 EM_JS(void, upload_image, (EMSCRIPTEN_WEBGL_CONTEXT_HANDLE gl, uintptr_t renderImage), {
@@ -310,7 +313,7 @@ public:
     {
         m_Width = width;
         m_Height = height;
-        m_readyToUpload = true;
+        m_readyToUpload = width > 0 && height > 0;
         decodedAsync();
     }
 
@@ -407,7 +410,7 @@ private:
     PLSResourceID m_mutationID = 0; // Tells when we are out of sync with the WebGL2BufferData.
 };
 
-class RenderImageWrapper; // Forward declaration for makeImageFromGLTexture return type.
+class WebGL2RenderImageWrapper; // Forward declaration for makeImageFromGLTexture return type.
 
 // Wraps a tightly coupled RiveRenderer and RenderContext, which are tied to a specific WebGL2
 // context.
@@ -729,7 +732,7 @@ public:
      * when the returned RenderImage is freed. Caller must ensure the
      * RenderImage outlives any external use of the texture.
      */
-    RenderImageWrapper* makeImageFromGLTexture(GLuint textureId, int width, int height);
+    WebGL2RenderImageWrapper* makeImageFromGLTexture(GLuint textureId, int width, int height);
 
     /**
      * Re-binds Rive's internal textures and invalidates the GL state
@@ -1636,9 +1639,17 @@ class WebGL2RenderImageWrapper : public wrapper<RenderImage>
 public:
     EMSCRIPTEN_WRAPPER(WebGL2RenderImageWrapper);
     void unref() { RenderImage::unref(); }
+
+    // Encoded WebGL2 images register their completion before returning from
+    // construction. Keep this internal: texture-backed images need no decode.
+    emscripten::val decodePromise()
+    {
+        return emscripten::val::module_property("images")
+            .call<emscripten::val>("get", reinterpret_cast<uintptr_t>(this))["decodePromise"];
+    }
 };
 
-RenderImageWrapper* WebGL2Renderer::makeImageFromGLTexture(
+WebGL2RenderImageWrapper* WebGL2Renderer::makeImageFromGLTexture(
     GLuint textureId, int width, int height)
 {
     ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
@@ -1648,7 +1659,7 @@ RenderImageWrapper* WebGL2Renderer::makeImageFromGLTexture(
     auto image = make_rcp<WebGL2RenderImage>(
         this, m_contextGL, textureId, width, height);
     image->ref();
-    return (RenderImageWrapper*)(image.get());
+    return (WebGL2RenderImageWrapper*)(image.get());
 }
 
 // Optional trailing session: an image bound into a deferred file has to be
@@ -1715,6 +1726,7 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
                   allow_raw_pointers());
     class_<RenderImage>("RenderImage")
         .function("unref", &WebGL2RenderImageWrapper::unref)
+        .function("_decodePromise", &WebGL2RenderImageWrapper::decodePromise)
         .allow_subclass<WebGL2RenderImageWrapper>("RenderImageWrapper");
 
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)

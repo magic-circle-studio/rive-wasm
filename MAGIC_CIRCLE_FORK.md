@@ -3,7 +3,7 @@
 This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
 official `rive-wasm` `2.42.2` tag (`dc4d3a12`) and the matching
 `rive-runtime` `runtime-v0.1.411` tag (`30742b4c`). The package version is
-`2.42.2-mc.2`. Both repositories replay the Magic Circle changes on these
+`2.42.2-mc.3`. Both repositories replay the Magic Circle changes on these
 upstream bases; the runtime submodule points to the Magic Circle mirror.
 
 The fork adds:
@@ -17,6 +17,13 @@ The fork adds:
 - asynchronous ImageBitmap decoding before the first image upload, with
   premultiplied alpha, bitmap cleanup, and an HTMLImageElement fallback for
   later contexts or browsers that cannot decode a bitmap.
+
+`2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
+decoding before invoking `decodeImage`'s callback, reports invalid images as
+`null`, and releases Blob URLs and native decode references on failure.
+The image-element fallback preserves the upstream runtime's multi-context
+contract; Magic Circle's current renderer sessions do not share images
+across contexts.
 
 ## Build
 
@@ -60,7 +67,8 @@ The test creates an npm tarball, installs that exact tarball into a temporary
 project, starts a local server, and drives real WebGL2 in headless Chrome. It
 checks both WASM variants with the same JS loader: public fork APIs,
 normal/Gold/Rainbow rendering, external render targets, overlay preservation,
-texture-backed images, bitmap decode fallbacks, bitmap cleanup, and teardown.
+texture-backed images, decode readiness and failures, Blob URL and bitmap
+cleanup, matching image uploads across two GL contexts, and teardown.
 Set `CHROME_BIN` if Chrome is not on PATH.
 Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 `RIVE_TEST_WASM` optionally restricts the binary under test.
