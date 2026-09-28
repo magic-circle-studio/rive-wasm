@@ -509,7 +509,16 @@ Module["onRuntimeInitialized"] = function () {
   // decoded against any other factory is dropped when that file draws.
   Module["decodeImage"] = function (bytes, onComplete, session = null) {
     let image = Module["decodeWebGL2Image"](bytes, session ?? null);
-    onComplete(image);
+    // A native handle exists before the browser has decoded drawable pixels.
+    // Match the canvas backend's callback timing so snapshots can await it.
+    image["_decodePromise"]().then(function (decoded) {
+      if (decoded) {
+        onComplete(image);
+      } else {
+        image["unref"]();
+        onComplete(null);
+      }
+    });
   };
 
   let align = Module["Renderer"]["prototype"]["align"];

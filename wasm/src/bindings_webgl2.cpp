@@ -179,11 +179,12 @@ EM_JS(void, decode_image, (uintptr_t renderImage, uintptr_t imgDataPtr, int imgD
     var bitmapPromise = typeof createImageBitmap === "function"
         ? createImageBitmap(blob, { premultiplyAlpha: "premultiply" }).catch(function() { return null; })
         : Promise.resolve(null);
-    image.onload = function() {
-        bitmapPromise.then(function(bitmap) {
-            if (bitmap)
-            {
-                if (images.get(renderImage) === image)
+    var objectUrl = URL.createObjectURL(blob);
+    image["decodePromise"] = new Promise(function(resolve) {
+        image.onload = function() {
+            URL.revokeObjectURL(objectUrl);
+            bitmapPromise.then(function(bitmap) {
+                if (bitmap)
                 {
                     var bitmaps = Module["imageBitmaps"];
                     if (!bitmaps)
@@ -193,23 +194,25 @@ EM_JS(void, decode_image, (uintptr_t renderImage, uintptr_t imgDataPtr, int imgD
                     }
                     bitmaps.set(renderImage, bitmap);
                 }
-                else
+                // The constructor's decode ref keeps renderImage alive until
+                // _setWebImage releases it, even if its caller already left.
+                Module["_setWebImage"](renderImage, image.width, image.height);
+                resolve(true);
+            });
+        };
+        image.onerror = function() {
+            URL.revokeObjectURL(objectUrl);
+            bitmapPromise.then(function(bitmap) {
+                if (bitmap)
                 {
                     bitmap.close();
                 }
-            }
-            Module["_setWebImage"](renderImage, image.width, image.height);
-        });
-    };
-    image.onerror = function() {
-        bitmapPromise.then(function(bitmap) {
-            if (bitmap)
-            {
-                bitmap.close();
-            }
-        });
-    };
-    image.src = URL.createObjectURL(blob);
+                Module["_setWebImage"](renderImage, 0, 0);
+                resolve(false);
+            });
+        };
+    });
+    image.src = objectUrl;
 });
 
 EM_JS(void, upload_image, (EMSCRIPTEN_WEBGL_CONTEXT_HANDLE gl, uintptr_t renderImage), {
@@ -295,7 +298,7 @@ public:
     {
         m_Width = width;
         m_Height = height;
-        m_readyToUpload = true;
+        m_readyToUpload = width > 0 && height > 0;
         decodedAsync();
     }
 
@@ -1274,6 +1277,14 @@ class RenderImageWrapper : public wrapper<RenderImage>
 public:
     EMSCRIPTEN_WRAPPER(RenderImageWrapper);
     void unref() { RenderImage::unref(); }
+
+    // Encoded WebGL2 images register their completion before returning from
+    // construction. Keep this internal: texture-backed images need no decode.
+    emscripten::val decodePromise()
+    {
+        return emscripten::val::module_property("images")
+            .call<emscripten::val>("get", reinterpret_cast<uintptr_t>(this))["decodePromise"];
+    }
 };
 
 RenderImageWrapper* WebGL2Renderer::makeImageFromGLTexture(
@@ -1346,6 +1357,7 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
                   allow_raw_pointers());
     class_<RenderImage>("RenderImage")
         .function("unref", &RenderImageWrapper::unref)
+        .function("_decodePromise", &RenderImageWrapper::decodePromise)
         .allow_subclass<RenderImageWrapper>("RenderImageWrapper");
 
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)

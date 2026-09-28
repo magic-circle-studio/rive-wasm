@@ -249,23 +249,43 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         sourceContext.fillRect(0, 0, 32, 32);
         const png = new Uint8Array(await (await sourceCanvas.convertToBlob()).arrayBuffer());
         const originalCreateImageBitmap = globalThis.createImageBitmap;
+        const originalCreateObjectURL = URL.createObjectURL;
+        const originalRevokeObjectURL = URL.revokeObjectURL;
+        const imageUrls = [];
+        const revokedUrls = new Set();
+        URL.createObjectURL = function(blob) {
+          const url = originalCreateObjectURL.call(URL, blob);
+          imageUrls.push(url);
+          return url;
+        };
+        URL.revokeObjectURL = function(url) {
+          revokedUrls.add(url);
+          originalRevokeObjectURL.call(URL, url);
+        };
         try {
+          const gate = Promise.withResolvers();
+          globalThis.createImageBitmap = async (...args) => {
+            await gate.promise;
+            return originalCreateImageBitmap(...args);
+          };
+          let callbackRan = false;
+          const delayedImage = new Promise((resolve) => rive.decodeImage(png, (image) => {
+            callbackRan = true;
+            resolve(image);
+          }));
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          assert(!callbackRan, "decodeImage completed before bitmap decoding.");
+          gate.resolve();
+          (await delayedImage).unref();
+
           for (const mode of ["bitmap", "unavailable", "rejected"]) {
-            let bitmapDecode;
             globalThis.createImageBitmap = mode === "bitmap"
-              ? (...args) => (bitmapDecode = originalCreateImageBitmap(...args))
+              ? originalCreateImageBitmap
               : mode === "unavailable"
                 ? undefined
                 : () => Promise.reject(new Error("Test bitmap decode failure"));
             const previous = new Set(rive.imageBitmaps?.values());
             const decoded = await new Promise((resolve) => rive.decodeImage(png, resolve));
-            // decodeImage returns the handle before its browser decode ends.
-            await Promise.all(Array.from(rive.images.values(), (image) =>
-              image.complete ? Promise.resolve() : new Promise((resolve) =>
-                image.addEventListener("load", resolve, { once: true }),
-              ),
-            ));
-            await bitmapDecode;
             const pending = Array.from(rive.imageBitmaps?.values() ?? [])
               .filter((bitmap) => !previous.has(bitmap));
             assert(
@@ -280,12 +300,74 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
               "Deleted image retained its bitmap in the runtime.",
             );
           }
+          globalThis.createImageBitmap = originalCreateImageBitmap;
+          const imageCount = rive.images.size;
+          const invalidImage = await new Promise((resolve) =>
+            rive.decodeImage(new Uint8Array([0, 1, 2, 3]), resolve),
+          );
+          assert(invalidImage === null, "Invalid image decode did not report failure.");
+          assert(rive.images.size === imageCount, "Invalid image leaked its native decode ref.");
+          assert(imageUrls.length > 0 && imageUrls.every((url) => revokedUrls.has(url)),
+            "Image decode leaked a Blob URL.");
         } finally {
           globalThis.createImageBitmap = originalCreateImageBitmap;
+          URL.createObjectURL = originalCreateObjectURL;
+          URL.revokeObjectURL = originalRevokeObjectURL;
         }
+
+        // The fork preserves upstream cross-context use even though Magic
+        // Circle keeps its image lifetimes within one renderer generation.
+        const previousBitmaps = new Set(rive.imageBitmaps.values());
+        const previousElements = new Set(rive.images.values());
+        const sharedImage = await new Promise((resolve) => rive.decodeImage(png, resolve));
+        const sharedBitmap = Array.from(rive.imageBitmaps.values()).find((bitmap) => !previousBitmaps.has(bitmap));
+        const sharedElement = Array.from(rive.images.values()).find((image) => !previousElements.has(image));
+        assert(sharedBitmap && sharedElement, "Shared image did not retain both upload sources.");
+        imageBinding.value(sharedImage);
+        imageBindingArtboard.bindViewModelInstance(imageBindingInstance);
+        imageBindingArtboard.advance(0);
+        /** Captures an image and the actual upload sources in one context. */
+        function drawBoundImage(targetRenderer, targetCanvas) {
+          const targetGl = targetCanvas.getContext("webgl2");
+          const uploadSources = [];
+          const texImage2D = targetGl.texImage2D;
+          targetGl.texImage2D = function(...args) {
+            uploadSources.push(args.at(-1));
+            return texImage2D.apply(this, args);
+          };
+          try {
+            targetRenderer.bindContext();
+            targetRenderer.clear();
+            targetRenderer.save();
+            targetRenderer.align(rive.Fit.contain, rive.Alignment.center,
+              { minX: 0, minY: 0, maxX: targetCanvas.width, maxY: targetCanvas.height },
+              imageBindingArtboard.bounds);
+            imageBindingArtboard.draw(targetRenderer);
+            targetRenderer.restore();
+            targetRenderer.flush();
+            return { uploadSources, pixels: readCanvasPixels(targetGl, targetCanvas.width, targetCanvas.height) };
+          } finally {
+            targetGl.texImage2D = texImage2D;
+          }
+        }
+        const firstContext = drawBoundImage(renderer, canvas);
+        const secondCanvas = document.createElement("canvas");
+        secondCanvas.width = canvas.width;
+        secondCanvas.height = canvas.height;
+        const secondRenderer = rive.makeRenderer(secondCanvas);
+        const secondContext = drawBoundImage(secondRenderer, secondCanvas);
+        assert(firstContext.uploadSources.includes(sharedBitmap) && sharedBitmap.width === 0,
+          "First context did not upload a bitmap.");
+        assert(secondContext.uploadSources.includes(sharedElement),
+          "Second context did not use the retained image element.");
+        assert(countOpaquePixels(firstContext.pixels) > 0 &&
+          countDifferentPixels(firstContext.pixels, secondContext.pixels) === 0,
+          "Image pixels changed across GL contexts.");
+        sharedImage.unref();
         imageBindingInstance.delete();
         imageBindingArtboard.delete();
         imageBindingFile.unref();
+        secondRenderer.delete();
 
         const fixtureBytes = new Uint8Array(await (await fetch("/fixture.riv")).arrayBuffer());
         const file = await rive.load(fixtureBytes);
