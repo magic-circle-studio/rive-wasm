@@ -3,7 +3,7 @@
 This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
 official `rive-wasm` `2.42.2` tag (`dc4d3a12`) and the matching
 `rive-runtime` `runtime-v0.1.411` tag (`30742b4c`). The package version is
-`2.42.2-mc.3`. Both repositories replay the Magic Circle changes on these
+`2.42.2-mc.4`. Both repositories replay the Magic Circle changes on these
 upstream bases; the runtime submodule points to the Magic Circle mirror.
 
 The fork adds:
@@ -24,6 +24,12 @@ decoding before invoking `decodeImage`'s callback, reports invalid images as
 The image-element fallback preserves the upstream runtime's multi-context
 contract; Magic Circle's current renderer sessions do not share images
 across contexts.
+
+`2.42.2-mc.4` cuts per-flush CPU on the WebGL2 MSAA (depthStencil) path,
+which Chrome always takes because it exposes no pixel local storage: the GL
+state cache skips stencil and base-instance calls that would not change
+anything, and paths are no longer measured point by point on every draw.
+Output is unchanged.
 
 ## Build
 
