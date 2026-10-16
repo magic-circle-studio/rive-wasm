@@ -27,16 +27,15 @@ target_enabled() {
 }
 
 # Both wasm binaries share one JS glue, so they must expose the same import and
-# export names and signatures. Verify this when building all wasm.
-# Executes on full builds only -- a -r build has no fallback. One call per
-# build: the base and _advanced packages are handed the same bytes.
+# export names and signatures. Selective WebGL2 builds include the fallback;
+# other selective builds do not. The base and advanced packages share bytes.
 verify_fallback() {
-    if [ -n "$TARGETS" ]; then
+    if [ -n "$TARGETS" ] && [ "$1" != "webgl2" ]; then
         return 0
     fi
     local pkg="../js/npm/$1"
     if [ ! -f "$pkg/rive_fallback.wasm" ]; then
-        echo "ERROR: $1: rive_fallback.wasm was not staged by this full build." >&2
+        echo "ERROR: $1: rive_fallback.wasm was not staged by this build." >&2
         echo "       Publishing now would ship a package whose fallback URL 404s." >&2
         return 1
     fi

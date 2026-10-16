@@ -515,17 +515,7 @@ public:
         // artifacts with certain blend modes (e.g. colorBurn).
         frameDescriptor.ditherMode = gpu::DitherMode::none;
 #endif
-        if (m_textureRenderTarget)
-        {
-            // Texture targets don't have canvas-level MSAA. Use
-            // internal MSAA when PLS is not available.
-            if (!m_renderContext->platformFeatures().supportsRasterOrderingMode &&
-                !m_renderContext->platformFeatures().supportsAtomicMode)
-            {
-                frameDescriptor.msaaSampleCount = 4;
-            }
-        }
-        else if (m_renderTarget->sampleCount() > 1)
+        if (!m_textureRenderTarget && m_renderTarget->sampleCount() > 1)
         {
             // Use MSAA if we were given a canvas with 'antialias: true'.
             frameDescriptor.msaaSampleCount = m_renderTarget->sampleCount();
@@ -544,8 +534,6 @@ public:
         // between here and flush() may need to reach this context.
         WebGL2Factory::Instance()->bindActiveRenderer(this);
     }
-
-public:
 
     void saveClipRect(float l, float t, float r, float b)
     {

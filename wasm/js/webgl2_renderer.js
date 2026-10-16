@@ -123,12 +123,6 @@ Module["onRuntimeInitialized"] = function () {
         GL.textures[this._externalTextureGLId] = null;
         this._externalTextureGLId = null;
       }
-      if (this._externalImageTextureGLIds) {
-        for (var i = 0; i < this._externalImageTextureGLIds.length; i++) {
-          GL.textures[this._externalImageTextureGLIds[i]] = null;
-        }
-        this._externalImageTextureGLIds = null;
-      }
       nativeDelete.call(this);
       GL.deleteContext(this._handle);
       this._handle = this._canvas = this._width = this._height = this._gl = null;
@@ -424,33 +418,29 @@ Module["onRuntimeInitialized"] = function () {
     return Module["startFileScripts"](load(bytes, loader, session ?? null));
   };
 
-  const cppClear = Module["WebGL2Renderer"]["prototype"]["clear"];
-  Module["WebGL2Renderer"]["prototype"]["clear"] = function () {
-    GL.makeContextCurrent(this._handle);
+  /** Prepares the shared context and the active canvas target for a frame. */
+  function prepareFrame(renderer) {
+    GL.makeContextCurrent(renderer._handle);
     // Only auto-resize from canvas when targeting the default framebuffer.
-    if (!this._externalTextureGLId) {
-      const canvas = this._canvas;
-      if (this._width != canvas.width || this._height != canvas.height) {
-        this.resize(canvas.width, canvas.height);
-        this._width = canvas.width;
-        this._height = canvas.height;
+    if (!renderer._externalTextureGLId) {
+      const canvas = renderer._canvas;
+      if (renderer._width != canvas.width || renderer._height != canvas.height) {
+        renderer.resize(canvas.width, canvas.height);
+        renderer._width = canvas.width;
+        renderer._height = canvas.height;
       }
     }
+  }
+
+  const cppClear = Module["WebGL2Renderer"]["prototype"]["clear"];
+  Module["WebGL2Renderer"]["prototype"]["clear"] = function () {
+    prepareFrame(this);
     cppClear.call(this);
   };
 
   const cppBeginOverlayFrame = Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"];
   Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"] = function () {
-    GL.makeContextCurrent(this._handle);
-    // Only auto-resize from canvas when targeting the default framebuffer.
-    if (!this._externalTextureGLId) {
-      const canvas = this._canvas;
-      if (this._width != canvas.width || this._height != canvas.height) {
-        this.resize(canvas.width, canvas.height);
-        this._width = canvas.width;
-        this._height = canvas.height;
-      }
-    }
+    prepareFrame(this);
     cppBeginOverlayFrame.call(this);
   };
 
@@ -498,10 +488,6 @@ Module["onRuntimeInitialized"] = function () {
       GL.makeContextCurrent(this._handle);
       var id = GL.getNewId(GL.textures);
       GL.textures[id] = webglTexture;
-      if (!this._externalImageTextureGLIds) {
-        this._externalImageTextureGLIds = [];
-      }
-      this._externalImageTextureGLIds.push(id);
       return cppMakeImageFromGLTexture.call(this, id, width, height);
     };
 

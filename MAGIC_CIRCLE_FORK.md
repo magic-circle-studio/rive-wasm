@@ -1,9 +1,9 @@
 # Magic Circle WebGL2 fork
 
 This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
-official `rive-wasm` `2.42.2` tag (`dc4d3a12`) and the matching
-`rive-runtime` `runtime-v0.1.411` tag (`30742b4c`). The package version is
-`2.42.2-mc.4`. Both repositories replay the Magic Circle changes on these
+official `rive-wasm` `2.44.2` tag (`85009a8b`) and its matching
+`rive-runtime` submodule commit (`2a043c31`). The package version is
+`2.44.2-mc.1`. Both repositories replay the Magic Circle changes on these
 upstream bases; the runtime submodule points to the Magic Circle mirror.
 
 The fork adds:
@@ -25,11 +25,20 @@ The image-element fallback preserves the upstream runtime's multi-context
 contract; Magic Circle's current renderer sessions do not share images
 across contexts.
 
-`2.42.2-mc.4` cuts per-flush CPU on the WebGL2 MSAA (depthStencil) path,
-which Chrome always takes because it exposes no pixel local storage: the GL
-state cache skips stencil and base-instance calls that would not change
-anything, and paths are no longer measured point by point on every draw.
-Output is unchanged.
+`2.44.2-mc.1` retains the per-flush CPU optimizations developed for the
+unpublished `2.42.2-mc.4` build. On the WebGL2 MSAA (depthStencil) path, the
+GL state cache skips redundant stencil and base-instance calls, dynamic
+batches set pipeline state only for their actual passes, and consecutive
+batches reuse matching program lookups. Scale/translation-only draws map
+cached path bounds; rotated, skewed and empty paths keep point-wise mapping.
+Upstream 2.44.2 already avoids measuring bounds for paints without images.
+The rebase carries material rendering into upstream's new MSAA fill/stroke
+shader, preserves coordinates on generated outside-stroke paths, and excludes
+luminance masks from material tinting.
+
+The original ~21% flush-CPU improvement was measured against 2.42.2-mc.3 on
+one desktop GPU, before the game adopted partial atlas redraws. It is not a
+performance claim for this upstream rebase.
 
 ## Build
 
@@ -47,7 +56,7 @@ On Nix systems whose shell exports host compiler variables, use:
 
 ```sh
 env -u CC -u CXX -u AR -u LD \
-  nix shell nixpkgs#python3 nixpkgs#gnumake \
+  nix shell nixpkgs#python3 nixpkgs#gnumake nixpkgs#nodejs \
   -c bash ./build_all_wasm.sh -r webgl2
 ```
 
@@ -57,8 +66,9 @@ sources of truth.
 
 The WebGL2 target builds both SIMD and scalar fallback binaries in separate
 directories. The release linker includes Emscripten's `exports.js` library to
-keep import/export names stable across these binaries while retaining `-Os`
-optimization. Without it, Emscripten 4.0.23 can assign incompatible minified
+keep import/export names stable across these binaries while retaining the
+upstream release optimizations. The upstream build also verifies their ABI.
+Without stable names, Emscripten 4.0.23 can assign incompatible minified
 names to the two binaries, breaking the shared JavaScript loader.
 
 ## Validate the publishable artifact
@@ -74,10 +84,30 @@ project, starts a local server, and drives real WebGL2 in headless Chrome. It
 checks both WASM variants with the same JS loader: public fork APIs,
 normal/Gold/Rainbow rendering, external render targets, overlay preservation,
 texture-backed images, decode readiness and failures, Blob URL and bitmap
-cleanup, matching image uploads across two GL contexts, and teardown.
+cleanup, matching image uploads across two GL contexts, stencil-state
+restoration after external GL changes, shader exports, and teardown.
 Set `CHROME_BIN` if Chrome is not on PATH.
 Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 `RIVE_TEST_WASM` optionally restricts the binary under test.
+
+The runtime's `[RiveRenderer]` native tests cover cached path bounds,
+material coordinates across outside-stroke poses, and luminance masks:
+
+```sh
+cd wasm/submodules/rive-runtime/tests/unit_tests
+./test.sh --match '[RiveRenderer]'
+```
+
+The full upstream native test build also expects its sibling native-tool
+sources, including `texture_compressor`, which this standalone checkout
+does not contain.
+
+Local validation of `2.44.2-mc.1` passed both packed WASM variants, all 20
+renderer tests linked separately from the full native suite, and Magic
+Circle's 21 Rive WebGL tests plus its client typecheck. The game's containment
+test allows one RGB level of rounding only within the redrawn neighboring
+sprite; the same three pixel differences reproduced with these optimizations
+removed. Alpha and pixels outside both atlas slots remain exact.
 
 ## Pet loading benchmark
 

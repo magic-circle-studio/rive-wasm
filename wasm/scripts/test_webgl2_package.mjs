@@ -205,6 +205,12 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
       async function main() {
         const packageRoot = "/node_modules/@magiccircle/rive-webgl2-advanced/";
         const { default: createRive } = await import(packageRoot + "webgl2_advanced.mjs");
+        const { surfaceMaterialShaderSource } = await import(packageRoot + "surface_material_shader.mjs");
+        assert(
+          surfaceMaterialShaderSource.includes("INLINE half3 apply_gold_material(") &&
+          surfaceMaterialShaderSource.includes("INLINE half3 apply_rainbow_material("),
+          "The packed package is missing its shared material shader entry points.",
+        );
         const rive = await createRive({
           locateFile: () => packageRoot + ${JSON.stringify(wasmFilename)},
         });
@@ -396,17 +402,8 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         const targetTexture = makeTexture(gl, canvas.width, canvas.height);
         renderer.setTargetTexture(targetTexture, canvas.width, canvas.height);
 
-        const opaquePixels = {};
-        const materialPixels = {};
-        for (const [name, material, timeSeconds] of [
-          ["normal", 0, 1.25],
-          ["gold", 1, 1.25],
-          ["goldStaticA", 1, -1],
-          ["goldStaticB", 1, -2],
-          ["rainbow", 2, 1.25],
-          ["rainbowStaticA", 2, -1],
-          ["rainbowStaticB", 2, -2],
-        ]) {
+        /** Captures the same pose through the shared-context handoff. */
+        function drawMaterial(material, timeSeconds) {
           bindRendererContext();
           renderer.invalidateGLState();
           renderer.clear();
@@ -431,12 +428,26 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           rive.resolveAnimationFrame();
           renderer.unbindGLInternalResources();
           bindRendererContext();
-          materialPixels[name] = readTexturePixels(
+          return readTexturePixels(
             gl,
             targetTexture,
             canvas.width,
             canvas.height,
           );
+        }
+
+        const opaquePixels = {};
+        const materialPixels = {};
+        for (const [name, material, timeSeconds] of [
+          ["normal", 0, 1.25],
+          ["gold", 1, 1.25],
+          ["goldStaticA", 1, -1],
+          ["goldStaticB", 1, -2],
+          ["rainbow", 2, 1.25],
+          ["rainbowStaticA", 2, -1],
+          ["rainbowStaticB", 2, -2],
+        ]) {
+          materialPixels[name] = drawMaterial(material, timeSeconds);
           opaquePixels[name] = countOpaquePixels(materialPixels[name]);
           const glError = gl.getError();
           assert(
@@ -444,6 +455,19 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             name + " rendered no visible pixels (WebGL error " + glError + ").",
           );
           assert(glError === gl.NO_ERROR, name + " left a WebGL error.");
+
+          // A host renderer can change each stencil face independently while
+          // Rive is idle. Its next draw must discard both cached face states.
+          gl.stencilFuncSeparate(gl.FRONT, gl.NEVER, 173, 0x5a);
+          gl.stencilFuncSeparate(gl.BACK, gl.NEVER, 87, 0xa5);
+          gl.stencilOpSeparate(gl.FRONT, gl.REPLACE, gl.INVERT, gl.ZERO);
+          gl.stencilOpSeparate(gl.BACK, gl.INVERT, gl.ZERO, gl.REPLACE);
+          const restoredPixels = drawMaterial(material, timeSeconds);
+          assert(
+            restoredPixels.every((byte, index) => byte === materialPixels[name][index]),
+            name + " changed after external stencil state was invalidated.",
+          );
+          assert(gl.getError() === gl.NO_ERROR, name + " state restoration left a WebGL error.");
         }
 
         const minimumChangedPixels = Math.max(
@@ -515,6 +539,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         const image = renderer.makeImageFromGLTexture(imageTexture, 2, 2);
         assert(image, "makeImageFromGLTexture() returned no image.");
         image.unref();
+        assert(!gl.isTexture(imageTexture), "Releasing an adopted image leaked its texture.");
 
         const pixelHashes = {};
         for (const [name, pixels] of Object.entries(materialPixels)) {
