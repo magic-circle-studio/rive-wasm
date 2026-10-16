@@ -280,7 +280,10 @@ export declare class RendererWrapper {
     width: number,
     height: number
   ): ImageInternal;
-  /** Selects the default material for supported subsequent artboard draws. */
+  /**
+   * Selects the default material for supported subsequent artboard draws.
+   * Additive paints retain their authored colors.
+   */
   setSurfaceMaterial(
     material: SurfaceMaterial,
     left: number,

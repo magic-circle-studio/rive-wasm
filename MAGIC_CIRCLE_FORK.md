@@ -3,7 +3,7 @@
 This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
 official `rive-wasm` `2.44.2` tag (`85009a8b`) and its matching
 `rive-runtime` submodule commit (`2a043c31`). The package version is
-`2.44.2-mc.1`. Both repositories replay the Magic Circle changes on these
+`2.44.2-mc.2`. Both repositories replay the Magic Circle changes on these
 upstream bases; the runtime submodule points to the Magic Circle mirror.
 
 The fork adds:
@@ -35,6 +35,11 @@ Upstream 2.44.2 already avoids measuring bounds for paints without images.
 The rebase carries material rendering into upstream's new MSAA fill/stroke
 shader, preserves coordinates on generated outside-stroke paths, and excludes
 luminance masks from material tinting.
+
+`2.44.2-mc.2` preserves additive paints' authored colors when a material is active.
+Their RGB is premultiplied by the original paint opacity, but upstream reduces
+only their blend alpha. Applying a material using that reduced alpha would erase
+fully additive paints and distort partially additive ones.
 
 The original ~21% flush-CPU improvement was measured against 2.42.2-mc.3 on
 one desktop GPU, before the game adopted partial atlas redraws. The 2.44.2
@@ -86,6 +91,9 @@ normal/Gold/Rainbow rendering, external render targets, overlay preservation,
 texture-backed images, decode readiness and failures, Blob URL and bitmap
 cleanup, matching image uploads across two GL contexts, stencil-state
 restoration after external GL changes, shader exports, and teardown.
+The additive fixture covers solid and gradient paints at 0%, 50%, and 100%
+additiveness; active materials preserve additive pixels exactly while ordinary
+paints still receive their tint.
 Set `CHROME_BIN` if Chrome is not on PATH.
 Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 `RIVE_TEST_WASM` optionally restricts the binary under test.

@@ -17,6 +17,10 @@ const imageBindingFixturePath = join(
   repositoryRoot,
   "wasm/submodules/rive-runtime/tests/unit_tests/assets/data_binding_images_test.riv",
 );
+const additiveFixturePath = join(
+  repositoryRoot,
+  "js/test/assets/surface_material_additive.riv",
+);
 const resultMarker = "RIVE_PACKAGE_TEST_RESULT";
 const legacyComparison = process.env.RIVE_TEST_LEGACY === "1";
 const artboardName = process.env.RIVE_TEST_ARTBOARD ?? null;
@@ -403,7 +407,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         renderer.setTargetTexture(targetTexture, canvas.width, canvas.height);
 
         /** Captures the same pose through the shared-context handoff. */
-        function drawMaterial(material, timeSeconds) {
+        function drawMaterial(material, timeSeconds, drawArtboard = artboard) {
           bindRendererContext();
           renderer.invalidateGLState();
           renderer.clear();
@@ -412,7 +416,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             rive.Fit.contain,
             rive.Alignment.center,
             { minX: 0, minY: 0, maxX: canvas.width, maxY: canvas.height },
-            artboard.bounds,
+            drawArtboard.bounds,
           );
           renderer.setSurfaceMaterial(
             material,
@@ -422,7 +426,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             canvas.height,
             timeSeconds,
           );
-          artboard.draw(renderer);
+          drawArtboard.draw(renderer);
           renderer.restore();
           renderer.flush();
           rive.resolveAnimationFrame();
@@ -533,6 +537,43 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           ) === 0,
           "beginOverlayFrame() did not preserve the external target.",
         );
+        // Additive blending reduces alpha while retaining RGB. Materials must
+        // preserve those authored colors rather than premultiply them again.
+        const additiveFile = await rive.load(new Uint8Array(
+          await (await fetch("/additive-fixture.riv")).arrayBuffer(),
+        ));
+        const additivePixels = {};
+        for (const paint of ["solid", "gradient"]) {
+          for (const amount of [0, 128, 255]) {
+            const name = paint + "-" + amount;
+            const additiveArtboard = additiveFile.artboardByName(name);
+            assert(additiveArtboard, "Missing additive fixture artboard: " + name);
+            additiveArtboard.advance(0);
+            const centerOffset =
+              (Math.floor(canvas.height / 2) * canvas.width + Math.floor(canvas.width / 2)) * 4;
+            const normal = drawMaterial(0, -1, additiveArtboard);
+            const center = normal.slice(centerOffset, centerOffset + 4);
+            additivePixels[name] = Array.from(center);
+            assert(center.slice(0, 3).every((byte) => byte > 0),
+              name + " has no additive RGB contribution.");
+            assert(Math.abs(center[3] - (255 - amount)) <= 1,
+              name + " has incorrect additive alpha: " + center[3]);
+            for (const material of [1, 2]) {
+              const tinted = drawMaterial(material, -1, additiveArtboard);
+              if (amount === 0) {
+                assert(countDifferentPixels(tinted, normal) > 0,
+                  name + " lost ordinary material rendering.");
+              } else {
+                assert(tinted.every((byte, index) => byte === normal[index]),
+                  name + " changed authored additive pixels with material " + material);
+              }
+              assert(gl.getError() === gl.NO_ERROR,
+                name + " left a WebGL error with material " + material);
+            }
+            additiveArtboard.delete();
+          }
+        }
+        additiveFile.unref();
         renderer.clearTargetTexture();
 
         const imageTexture = makeTexture(gl, 2, 2);
@@ -559,6 +600,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           opaquePixels,
           materialDifferences,
           staticMaterialDifferences,
+          additivePixels,
           pixelHashes,
         });
       }
@@ -624,6 +666,7 @@ async function main(wasmFilename) {
       imageBindingFixturePath,
       join(temporaryDirectory, "image-binding-fixture.riv"),
     );
+    await copyFile(additiveFixturePath, join(temporaryDirectory, "additive-fixture.riv"));
     await writeFile(join(temporaryDirectory, "index.html"), testPage(wasmFilename));
 
     const server = await startServer(temporaryDirectory);
