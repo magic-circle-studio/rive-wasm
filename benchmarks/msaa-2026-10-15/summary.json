@@ -1,0 +1,269 @@
+{
+  "method": "Ratio of paired block means; 20,000 paired block bootstrap resamples, fixed seed 2442; percentile 95% intervals. Each block averages 120 frames. Frame samples are not treated as independent observations. Two opposite context-creation orders per A/B scenario.",
+  "harnessSha256": "9af70467282f99bba72d379acb02f2144cd98f71b5f76554cf0c21a01344a026",
+  "scenarios": {
+    "aa-control-8": {
+      "pairedBlocks": 12,
+      "framesPerVariant": 1440,
+      "metrics": {
+        "flushMs": {
+          "baselineMeanMs": 1.744548611301515,
+          "optimizedMeanMs": 1.749170139638914,
+          "differenceMs": 0.00462152833739915,
+          "changePercent": 0.2649125571772659,
+          "change95PercentCI": [
+            -2.1644610676061715,
+            3.237667468245853
+          ],
+          "baselineP95FrameMs": 3.209999978542328,
+          "optimizedP95FrameMs": 3.134999990463257
+        },
+        "advanceMs": {
+          "baselineMeanMs": 0.2654548606938786,
+          "optimizedMeanMs": 0.266520832810137,
+          "differenceMs": 0.001065972116258418,
+          "changePercent": 0.4015643614406095,
+          "change95PercentCI": [
+            -0.8070742400298481,
+            1.5694618112390035
+          ],
+          "baselineP95FrameMs": 0.5600000023841858,
+          "optimizedP95FrameMs": 0.5450000166893005
+        },
+        "totalMs": {
+          "baselineMeanMs": 2.010003471995393,
+          "optimizedMeanMs": 2.015690972449051,
+          "differenceMs": 0.0056875004536576235,
+          "changePercent": 0.2829597328014355,
+          "change95PercentCI": [
+            -1.7870188108797258,
+            2.9297937790861317
+          ],
+          "baselineP95FrameMs": 3.7200000286102295,
+          "optimizedP95FrameMs": 3.7350000143051147
+        }
+      },
+      "perRun": [
+        {
+          "creationOrder": [
+            "control",
+            "optimized"
+          ],
+          "baselineMeanMs": 1.744548611301515,
+          "optimizedMeanMs": 1.749170139638914,
+          "flushChangePercent": 0.2649125571772659
+        }
+      ],
+      "glCalls": {
+        "control": 11439,
+        "optimized": 11439
+      },
+      "pixelComparisons": 3,
+      "changedPixelBytes": 0
+    },
+    "full-atlas-8": {
+      "pairedBlocks": 24,
+      "framesPerVariant": 2880,
+      "metrics": {
+        "flushMs": {
+          "baselineMeanMs": 1.9619930562873682,
+          "optimizedMeanMs": 1.7084340278473165,
+          "differenceMs": -0.25355902844005174,
+          "changePercent": -12.923543619458844,
+          "change95PercentCI": [
+            -13.49793500345029,
+            -12.262160946963318
+          ],
+          "baselineP95FrameMs": 3.3799999952316284,
+          "optimizedP95FrameMs": 2.8950000405311584
+        },
+        "advanceMs": {
+          "baselineMeanMs": 0.33984548563344613,
+          "optimizedMeanMs": 0.33657812484436567,
+          "differenceMs": -0.0032673607890804646,
+          "changePercent": -0.9614253910097847,
+          "change95PercentCI": [
+            -1.6894599503335939,
+            -0.2005452378043504
+          ],
+          "baselineP95FrameMs": 0.6899999976158142,
+          "optimizedP95FrameMs": 0.675000011920929
+        },
+        "totalMs": {
+          "baselineMeanMs": 2.301838541920814,
+          "optimizedMeanMs": 2.0450121526916822,
+          "differenceMs": -0.2568263892291318,
+          "changePercent": -11.157445865634784,
+          "change95PercentCI": [
+            -11.636007355480693,
+            -10.601242153895418
+          ],
+          "baselineP95FrameMs": 4.040000021457672,
+          "optimizedP95FrameMs": 3.5550000071525574
+        }
+      },
+      "perRun": [
+        {
+          "creationOrder": [
+            "baseline",
+            "optimized"
+          ],
+          "baselineMeanMs": 1.8316215281685193,
+          "optimizedMeanMs": 1.600510417090522,
+          "flushChangePercent": -12.617842033615467
+        },
+        {
+          "creationOrder": [
+            "optimized",
+            "baseline"
+          ],
+          "baselineMeanMs": 2.092364584406217,
+          "optimizedMeanMs": 1.8163576386041111,
+          "flushChangePercent": -13.191149757509047
+        }
+      ],
+      "glCalls": {
+        "baseline": 17090,
+        "optimized": 11439
+      },
+      "pixelComparisons": 6,
+      "changedPixelBytes": 0
+    },
+    "partial-atlas-3": {
+      "pairedBlocks": 24,
+      "framesPerVariant": 2880,
+      "metrics": {
+        "flushMs": {
+          "baselineMeanMs": 0.96839583331926,
+          "optimizedMeanMs": 0.8503541662254267,
+          "differenceMs": -0.11804166709383335,
+          "changePercent": -12.189402621574219,
+          "change95PercentCI": [
+            -12.652747246036656,
+            -11.674300762870049
+          ],
+          "baselineP95FrameMs": 1.7649999856948853,
+          "optimizedP95FrameMs": 1.5799999833106995
+        },
+        "advanceMs": {
+          "baselineMeanMs": 0.17860243099017276,
+          "optimizedMeanMs": 0.1786006943633159,
+          "differenceMs": -1.7366268568463905e-06,
+          "changePercent": -0.0009723422280560889,
+          "change95PercentCI": [
+            -1.5542027969896566,
+            1.3967578631383981
+          ],
+          "baselineP95FrameMs": 0.42000001668930054,
+          "optimizedP95FrameMs": 0.4350000023841858
+        },
+        "totalMs": {
+          "baselineMeanMs": 1.1469982643094327,
+          "optimizedMeanMs": 1.0289548605887426,
+          "differenceMs": -0.11804340372069011,
+          "changePercent": -10.291506743627021,
+          "change95PercentCI": [
+            -10.838452291990397,
+            -9.667713008713108
+          ],
+          "baselineP95FrameMs": 2.185000002384186,
+          "optimizedP95FrameMs": 2.024999976158142
+        }
+      },
+      "perRun": [
+        {
+          "creationOrder": [
+            "baseline",
+            "optimized"
+          ],
+          "baselineMeanMs": 0.860305554792285,
+          "optimizedMeanMs": 0.7563368058039083,
+          "flushChangePercent": -12.085095627852738
+        },
+        {
+          "creationOrder": [
+            "optimized",
+            "baseline"
+          ],
+          "baselineMeanMs": 1.076486111846235,
+          "optimizedMeanMs": 0.9443715266469452,
+          "flushChangePercent": -12.272762625121626
+        }
+      ],
+      "glCalls": {
+        "baseline": 7898,
+        "optimized": 5458
+      },
+      "pixelComparisons": 6,
+      "changedPixelBytes": 0
+    },
+    "avatar-only-1": {
+      "pairedBlocks": 24,
+      "framesPerVariant": 2880,
+      "metrics": {
+        "flushMs": {
+          "baselineMeanMs": 0.1678420138855775,
+          "optimizedMeanMs": 0.165614583902061,
+          "differenceMs": -0.0022274299835165212,
+          "changePercent": -1.3270991761544448,
+          "change95PercentCI": [
+            -1.8801394778428349,
+            -0.7530629810504008
+          ],
+          "baselineP95FrameMs": 0.22499996423721313,
+          "optimizedP95FrameMs": 0.2250000238418579
+        },
+        "advanceMs": {
+          "baselineMeanMs": 0.06290277801454067,
+          "optimizedMeanMs": 0.06338888859997194,
+          "differenceMs": 0.00048611058543127084,
+          "changePercent": 0.7727966884370385,
+          "change95PercentCI": [
+            0.04955331068798863,
+            1.4615440588165995
+          ],
+          "baselineP95FrameMs": 0.09000003337860107,
+          "optimizedP95FrameMs": 0.09499996900558472
+        },
+        "totalMs": {
+          "baselineMeanMs": 0.2307447919001182,
+          "optimizedMeanMs": 0.2290034725020329,
+          "differenceMs": -0.001741319398085306,
+          "changePercent": -0.7546516581137253,
+          "change95PercentCI": [
+            -1.2518237082044137,
+            -0.2325121731078128
+          ],
+          "baselineP95FrameMs": 0.3199999928474426,
+          "optimizedP95FrameMs": 0.32499998807907104
+        }
+      },
+      "perRun": [
+        {
+          "creationOrder": [
+            "baseline",
+            "optimized"
+          ],
+          "baselineMeanMs": 0.1662500007285012,
+          "optimizedMeanMs": 0.16306597284144825,
+          "flushChangePercent": -1.9152047356996493
+        },
+        {
+          "creationOrder": [
+            "optimized",
+            "baseline"
+          ],
+          "baselineMeanMs": 0.1694340270426538,
+          "optimizedMeanMs": 0.1681631949626737,
+          "flushChangePercent": -0.7500453729168521
+        }
+      ],
+      "glCalls": {
+        "baseline": 1073,
+        "optimized": 993
+      },
+      "pixelComparisons": 6,
+      "changedPixelBytes": 0
+    }
+  }
+}

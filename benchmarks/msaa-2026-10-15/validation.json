@@ -1,0 +1,6 @@
+{
+  "before": "name, driver_version, utilization.gpu [%], temperature.gpu, clocks.current.graphics [MHz], clocks.current.memory [MHz]\nNVIDIA GeForce RTX 2060 SUPER, 595.104.02, 0 %, 50, 300 MHz, 405 MHz\n",
+  "after": "name, driver_version, utilization.gpu [%], temperature.gpu, clocks.current.graphics [MHz], clocks.current.memory [MHz]\nNVIDIA GeForce RTX 2060 SUPER, 595.104.02, 0 %, 50, 300 MHz, 405 MHz\n",
+  "negativeControl": "Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\npage.evaluate: Error: Pixel parity failed: 1 bytes at initial\n    at comparePixels (eval at evaluate (:290:30), <anonymous>:137:29)\n    at runBenchmark (eval at evaluate (:290:30), <anonymous>:142:9)\n    at async <anonymous>:316:30\n    at /tmp/rive-2442-benchmark/benchmark_msaa.mjs:270:33\n\nNode.js v24.13.0\n",
+  "command": "nix develop . --command node /path/to/rive-wasm/benchmarks/msaa-2026-10-15/benchmark.mjs . BASELINE_DIR OPTIMIZED_DIR OUTPUT_JSON"
+}

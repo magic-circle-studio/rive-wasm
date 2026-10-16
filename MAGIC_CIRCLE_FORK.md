@@ -37,8 +37,8 @@ shader, preserves coordinates on generated outside-stroke paths, and excludes
 luminance masks from material tinting.
 
 The original ~21% flush-CPU improvement was measured against 2.42.2-mc.3 on
-one desktop GPU, before the game adopted partial atlas redraws. It is not a
-performance claim for this upstream rebase.
+one desktop GPU, before the game adopted partial atlas redraws. The 2.44.2
+comparison below measures the remaining benefit against the same release.
 
 ## Build
 
@@ -108,6 +108,51 @@ Circle's 21 Rive WebGL tests plus its client typecheck. The game's containment
 test allows one RGB level of rounding only within the redrawn neighboring
 sprite; the same three pixel differences reproduced with these optimizations
 removed. Alpha and pixels outside both atlas slots remain exact.
+
+## MSAA flush benchmark (2026-10-15)
+
+On this machine (Ryzen 9 5900X, RTX 2060 SUPER, NVIDIA 595.104.02), Chromium
+143.0.7499.4 used the physical GPU through ANGLE/OpenGL ES 3.2. Both builds use
+the same 2.44.2 fork, release flags, and byte-identical JavaScript loader. The
+baseline reverses only optimization commits `f9dbba34` and `355d5907`.
+
+| Atlas workload | Baseline CPU/flush | Optimized CPU/flush | Reduction (95% interval) |
+| --- | ---: | ---: | ---: |
+| All eight artboards | 1.962 ms | 1.708 ms | 12.9% (12.3–13.5%) |
+| Three of eight redrawn | 0.968 ms | 0.850 ms | 12.2% (11.7–12.6%) |
+| Avatar only | 0.168 ms | 0.166 ms | 1.3% (0.7–1.9%) |
+
+Each workload has 24 paired blocks of 120 measured frames, with alternating
+execution order every frame and reversed context creation order in the second
+run. Intervals bootstrap paired block means rather than individual frames.
+The same-build A/A control averaged +0.26% (95% interval −2.16% to +3.24%).
+The avatar-only difference is about two microseconds and has little practical
+value; the busy-atlas saving remains useful after rebasing.
+
+The replay uses the original eight artboards and recorded dimensions, with
+current asset bytes in a 291×455 atlas. Partial redraws freeze the other
+artboards and reproduce regional clearing plus `beginOverlayFrame`. The
+three-artboard subset is AvatarElements, WoodWindmill, and WindSpinner.
+These are CPU timings for the atlas render handoff, including both sampler
+unbind loops. They do not measure whole-game FPS or performance on phones.
+
+All 21 initial/warmup/end bytewise atlas comparisons matched exactly, and
+both builds issued the same draw calls. Full-atlas GL calls fell from 17,090
+to 11,439 (33.1%). A negative control that changed one pixel byte correctly
+failed the parity check. GL counting and pixel readback run outside timing.
+
+`benchmarks/msaa-2026-10-15/` retains the exact benchmark harness, compressed
+per-frame samples, package/asset hashes, baseline source diff, summary, and
+hardware/negative-control evidence. From a Magic Circle Nix development shell:
+
+```sh
+node /path/to/rive-wasm/benchmarks/msaa-2026-10-15/benchmark.mjs \
+  /path/to/magiccircle.gg /path/to/baseline /path/to/optimized /tmp/msaa.json
+python3 /path/to/rive-wasm/benchmarks/msaa-2026-10-15/summarize.py \
+  /tmp/msaa.json /tmp/msaa-summary.json
+```
+
+The recorded samples can also be re-summarized directly from `samples.json.gz`.
 
 ## Pet loading benchmark
 
