@@ -1,0 +1,43 @@
+{
+  "name": "@magiccircle/rive-webgpu-advanced",
+  "version": "2.44.2-mc.3",
+  "description": "Magic Circle's Rive WebGPU advanced runtime fork.",
+  "main": "webgpu_advanced.mjs",
+  "homepage": "https://rive.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/magic-circle-studio/rive-wasm.git",
+    "directory": "js"
+  },
+  "keywords": [
+    "rive",
+    "animation",
+    "webgpu"
+  ],
+  "author": "Rive",
+  "contributors": [
+    "Luigi Rosso <luigi@rive.app> (https://rive.app)",
+    "Maxwell Talbot <max@rive.app> (https://rive.app)",
+    "Arthur Vivian <arthur@rive.app> (https://rive.app)",
+    "Umberto Sonnino <umberto@rive.app> (https://rive.app)",
+    "Matthew Sullivan <matt.j.sullivan@gmail.com> (mailto:matt.j.sullivan@gmail.com)",
+    "Chris Dalton <chris@rive.app> (https://rive.app)"
+  ],
+  "license": "MIT",
+  "files": [
+    "webgpu_advanced.mjs",
+    "rive.wasm",
+    "webgpu_advanced.mjs.d.ts",
+    "rive_advanced.mjs.d.ts",
+    "surface_material_shader.mjs",
+    "surface_material_shader.mjs.d.ts"
+  ],
+  "types": "webgpu_advanced.mjs.d.ts",
+  "dependencies": {
+    "@webgpu/types": "^0.1.69"
+  },
+  "browser": {
+    "fs": false,
+    "path": false
+  }
+}

@@ -90,6 +90,11 @@ while getopts "clswtr:" flag; do
             # with_rive_canvas brings in the ore GL backend and the deferred
             # host layer for the synchronous deferred renderer.
             RENDERER_FLAGS="--renderer=webgl2 --no-rive-decoders --with_rive_canvas "
+        elif [ "${OPTARG}" = "webgpu" ]; then
+            # webgpu-version=2 selects Dawn's emdawnwebgpu port (webgpu.h).
+            # Shader generation needs glslangValidator, spirv-opt and naga;
+            # build_webgpu.sh supplies pinned versions.
+            RENDERER_FLAGS="--renderer=webgpu --no-rive-decoders --with-webgpu --webgpu-version=2 "
         elif [ "${OPTARG}" = "c2d" ]; then
             # Images decode in JS, so the renderer's built-in decoding is
             # unreachable here and its symbols would go unresolved.

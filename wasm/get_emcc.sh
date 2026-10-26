@@ -49,10 +49,22 @@ if [[ ! -f "${EMSDK_DIR}/emsdk_env.sh" ]]; then
     echo "Emscripten SDK setup complete"
 fi
 
+# emsdk clears these overrides while switching SDKs. Retain explicit caller
+# settings so a shared SDK can use a checkout-local cache and Python wrapper.
+RIVE_EM_CACHE="${EM_CACHE:-}"
+RIVE_EMSDK_PYTHON="${EMSDK_PYTHON:-}"
 echo "Sourcing Emscripten SDK environment..."
 if ! source "./${EMSDK_DIR}/emsdk_env.sh"; then
     echo "Failed to source Emscripten SDK environment"
     exit 1
 fi
+
+if [[ -n "$RIVE_EM_CACHE" ]]; then
+    export EM_CACHE="$RIVE_EM_CACHE"
+fi
+if [[ -n "$RIVE_EMSDK_PYTHON" ]]; then
+    export EMSDK_PYTHON="$RIVE_EMSDK_PYTHON"
+fi
+unset RIVE_EM_CACHE RIVE_EMSDK_PYTHON
 
 echo "Emscripten SDK environment loaded successfully"

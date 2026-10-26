@@ -7,7 +7,8 @@ set -e
 #             changed C++ files are recompiled.
 # -r <targets> For local dev. Comma-separated list of targets to build.
 #             Builds specified targets; webgl2 includes its fallback WASM.
-#             Available: canvas, canvas-lite, canvas-single, webgl2
+#             Available: canvas, canvas-lite, canvas-single, webgl2, webgpu
+#             (webgpu builds only when named.)
 WASM_CONFIG=release
 TARGETS=""
 INCREMENTAL=0
@@ -71,6 +72,9 @@ rm -f ../js/npm/webgl2_advanced/*.wasm
 rm -f ../js/npm/webgl2/*.mjs
 rm -f ../js/npm/webgl2/*.wasm
 
+rm -f ../js/npm/webgpu_advanced/*.mjs*
+rm -f ../js/npm/webgpu_advanced/*.wasm
+
 mkdir -p ../js/npm/canvas
 mkdir -p ../js/npm/canvas_lite
 mkdir -p ../js/npm/canvas_single
@@ -79,6 +83,7 @@ mkdir -p ../js/npm/canvas_advanced_lite
 mkdir -p ../js/npm/canvas_advanced_single
 mkdir -p ../js/npm/webgl2
 mkdir -p ../js/npm/webgl2_advanced
+mkdir -p ../js/npm/webgpu_advanced
 
 if [ "$INCREMENTAL" -eq 0 ]; then
     echo
@@ -161,4 +166,23 @@ if target_enabled "webgl2"; then
         submodules/rive-runtime/renderer/src/shaders/surface_material.glsl \
         ../js/npm/webgl2_advanced/surface_material_shader.mjs \
         ../js/npm/webgl2_advanced/surface_material_shader.mjs.d.ts
+fi
+
+# Opt-in only: an empty -r list builds every published target, not this one.
+# SIMD only: every browser with WebGPU also has wasm SIMD.
+if [ -n "$TARGETS" ] && target_enabled "webgpu"; then
+    echo
+    echo "::::: building @magiccircle/rive-webgpu-advanced"
+    echo
+    # wgsl_to_header.py renames identifiers in set order; a fixed hash seed
+    # keeps rebuilt shaders, and so the wasm, byte-identical.
+    PYTHONHASHSEED=0 OUT_DIR=build/webgpu_advanced/bin/${WASM_CONFIG} ./build_wasm.sh -r webgpu ${WASM_CONFIG}
+    cp build/webgpu_advanced/bin/${WASM_CONFIG}/webgpu_advanced.mjs ../js/npm/webgpu_advanced/webgpu_advanced.mjs
+    cp build/webgpu_advanced/bin/${WASM_CONFIG}/webgpu_advanced.wasm ../js/npm/webgpu_advanced/rive.wasm
+    cp ../js/src/rive_advanced.mjs.d.ts ../js/npm/webgpu_advanced/rive_advanced.mjs.d.ts
+    cp ../js/src/rive_webgpu_advanced.mjs.d.ts ../js/npm/webgpu_advanced/webgpu_advanced.mjs.d.ts
+    node scripts/export_surface_material_shader.mjs \
+        submodules/rive-runtime/renderer/src/shaders/surface_material.glsl \
+        ../js/npm/webgpu_advanced/surface_material_shader.mjs \
+        ../js/npm/webgpu_advanced/surface_material_shader.mjs.d.ts
 fi

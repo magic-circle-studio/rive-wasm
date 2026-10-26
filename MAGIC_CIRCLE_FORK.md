@@ -1,6 +1,7 @@
-# Magic Circle WebGL2 fork
+# Magic Circle Rive fork
 
-This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
+This branch builds `@magiccircle/rive-webgl2-advanced` and
+`@magiccircle/rive-webgpu-advanced`. It starts from the
 official `rive-wasm` `2.44.2` tag (`85009a8b`) and its matching
 `rive-runtime` submodule commit (`2a043c31`). The package version is
 `2.44.2-mc.2`. Both repositories replay the Magic Circle changes on these
@@ -16,7 +17,9 @@ The fork adds:
 - a generated JavaScript export of the same material shader source; and
 - asynchronous ImageBitmap decoding before the first image upload, with
   premultiplied alpha, bitmap cleanup, and an HTMLImageElement fallback for
-  later contexts or browsers that cannot decode a bitmap.
+  later contexts or browsers that cannot decode a bitmap; and
+- a WebGPU flavour that renders into caller-owned `GPUTexture`s on the host's
+  `GPUDevice` (see [WebGPU package](#webgpu-package)).
 
 `2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
 decoding before invoking `decodeImage`'s callback, reports invalid images as
@@ -181,3 +184,143 @@ it does not measure network loading, rendering throughput, or mobile devices.
 Before publishing, push the runtime mirror commit first and the parent
 `rive-wasm` commit second. Publish the package manually with the `mc` npm tag;
 do not use the upstream release workflow.
+
+## WebGPU package
+
+`@magiccircle/rive-webgpu-advanced` is the same runtime on Rive's WebGPU
+backend, compiled with Emscripten's emdawnwebgpu port. The host (Pixi) owns
+the `GPUAdapter`, `GPUDevice` and every target texture; Rive imports them and
+never destroys them. Files, artboards, state machines, view models, images
+and surface materials behave as in the WebGL2 package, including image
+materials in atomics mode and the 2.44.2 MSAA fill/stroke and feather-atlas
+shaders. Compatibility devices without vertex storage buffers use MSAA.
+
+### Build
+
+```sh
+wasm/build_webgpu.sh                        # webgpu only
+wasm/build_webgpu.sh -i -r webgl2,webgpu    # incremental, keeps webgl2 staged
+```
+
+The `webgpu` target builds only when `-r` names it, so the default
+`build_all_wasm.sh` run is unchanged. `build_all_wasm.sh` empties every staged
+package first; name `webgl2` too when both packages should stay staged. The
+output is staged in `js/npm/webgpu_advanced`: `webgpu_advanced.mjs`,
+`rive.wasm` (SIMD only; every browser with WebGPU has wasm SIMD), the type
+declarations and `surface_material_shader.mjs`.
+
+WebGPU shaders are generated at build time (GLSL → glslangValidator →
+spirv-opt → naga → WGSL → C++ headers), so the tools decide the binary.
+`build_webgpu.sh` takes the tools from one locked nixpkgs revision,
+`https://releases.nixos.org/nixpkgs/nixpkgs-26.11pre1100667.674a2028661e/nixexprs.tar.zst`
+(rev `674a2028661e550a97400c1cc992b9cca9a668a1`, narHash
+`sha256-GNxqGToDYDZH2M4YeIj5nLPEyljtn3hEdIFY1/JNm0M=`):
+
+| Tool | Version | Store path |
+| --- | --- | --- |
+| glslang | 16.6.0 | `/nix/store/h8qbmv3y1c1rp603gkcsh10141328wbk-glslang-16.6.0-bin` |
+| spirv-tools | 1.4.363.0 (SPIRV-Tools v2026.4) | `/nix/store/z5hs3p3inrq3w8cv71jycz7l4y3ny5xk-spirv-tools-1.4.363.0` |
+| naga (wgpu-utils) | 29.0.1 | `/nix/store/52zy7lkia433yhjd57x9c045h34s3h51-wgpu-utils-29.0.1` |
+| gnumake | 4.4.1 | `/nix/store/vs2sa1msvkjxbb70h47819zq8a9srj21-gnumake-4.4.1` |
+| python3 | 3.14.8 | `/nix/store/xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8` |
+
+The script prints the naga, spirv-opt and glslang versions before building.
+`build_all_wasm.sh` sets `PYTHONHASHSEED=0` for this target:
+`wgsl_to_header.py` renames identifiers in set order, and the fixed seed keeps
+rebuilt shaders, and so the wasm, byte-identical. Emscripten `4.0.23` (from
+`get_emcc.sh`) pins the emdawnwebgpu port (`v20251002.162335`).
+
+### Validate
+
+```sh
+npm --prefix js run test:webgpu-package
+```
+
+Like the WebGL2 test, this packs the package, installs the tarball (with its
+`@webgpu/types` dependency, so it needs the npm registry) and drives real
+WebGPU on SwiftShader in headless Chrome; set `CHROME_BIN` if needed. It
+checks the public API, normal/Gold/Rainbow and MSAA rendering, overlay
+preservation, clip rects, eight back-to-back flushes against one flush,
+texture-backed and browser-decoded images, and re-init after device loss
+with identical pixels. Any WebGPU validation error fails it.
+`RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` work as in the WebGL2 test.
+
+### Differences from the WebGL2 package
+
+Everything Magic Circle's client uses from the WebGL2 package exists here,
+except the GL handoff members, which have no WebGPU meaning:
+
+| WebGL2 package | WebGPU package |
+| --- | --- |
+| `makeRenderer(canvas, offscreen?)` | `initWebGPU(adapter, device, { compatibilityMode? })` once, then `makeRenderer()` |
+| `renderer.setTargetTexture(glTexture, width, height)` | `renderer.setTargetTexture(gpuTexture)` |
+| `renderer.clear()`, `beginOverlayFrame()` | same, plus optional `clearColor` and `msaaSampleCount` |
+| `renderer.flush()`, then `rive.resolveAnimationFrame()` | `flush()` submits its own command buffer; `resolveAnimationFrame()` is a no-op |
+| `bindContext()`, `invalidateGLState()`, `unbindGLInternalResources()` | not present: Rive shares no GL state with the host |
+| `renderer.makeImageFromGLTexture(texture, w, h)` | `rive.makeImageFromWebGPUTexture(gpuTexture)`; Rive does not destroy the texture |
+| `decodeImage(bytes, cb)` | same; the browser decodes, and `cb` gets the image after upload or `null` |
+| `load(bytes, loader, enableRiveAssetCDN = true)` | same, but the CDN loader defaults off and there are no deferred sessions |
+| `saveClipRect`, `restoreClipRect`, `setSurfaceMaterial`, `align` | same; WebGPU targets are top-down, so clip rects need no Y flip |
+| `rive.wasm` and `rive_fallback.wasm` | `rive.wasm` only |
+
+Offscreen renderer pooling, `requestAnimationFrame`, deferred sessions and
+the canvas renderer are not built. `locateFile` defaults to `rive.wasm`
+relative to the page; bundled hosts pass their own, as with the WebGL2 package.
+
+Types: `webgpu_advanced.mjs.d.ts` (from `js/src/rive_webgpu_advanced.mjs.d.ts`)
+re-exports the shared `rive_advanced.mjs.d.ts`, which ships unchanged beside
+it, and redeclares only `RiveOptions`, `RiveCanvas`, `Renderer`,
+`ImageCallback` and `DecodeImage`. `Artboard.draw()` takes `RendererBase`,
+the members every flavour's renderer shares. Like Pixi, the package depends on
+`@webgpu/types` and references it; TypeScript 7's DOM library declares WebGPU
+too, so consumers need `skipLibCheck`, as Pixi already requires.
+
+### Flush contract
+
+Rive uploads each flush's data with `queue.writeBuffer()` into rings three
+buffers deep. Commands recorded into a host encoder and submitted later would
+read buffers that later flushes have already overwritten: a fourth flush
+before the host submits corrupts the first. `flush()` therefore always
+encodes into its own command buffer and submits it before returning, so any
+number of flushes per host frame is safe, and queue order makes host commands
+submitted afterwards sample the finished texture. There is no host-encoder
+variant.
+
+### Device-loss contract
+
+When `device.lost` resolves, request a new adapter and device and call
+`initWebGPU()` again; it returns false, keeping the previous device, if Rive
+cannot use the new one. A successful call releases the previous context's GPU
+resources and makes everything created on the previous device stale:
+
+- stale renderers throw from `setTargetTexture()`, `clear()`,
+  `beginOverlayFrame()` and `flush()`; `delete()` them and call
+  `makeRenderer()`;
+- stale files, artboards, state machines, view-model instances and images
+  stay memory-safe to advance and release but must not be drawn; release
+  them, then `load()` and decode again.
+
+The emptied context object stays alive for the module's lifetime, because
+stale files keep raw factory pointers into it. A voluntary switch to another
+device follows the same rules.
+
+### WebGL2 release state
+
+Magic Circle ships `@magiccircle/rive-webgl2-advanced@2.42.2-mc.3`, built
+from `ar/2.44.2-msaa-rebase` (`2f9fbfe`): `mc.2` added browser bitmap
+decoding and `mc.3` waits for decoded pixels and types the decode callback as
+`Image | null`. That branch also holds an unpublished WebGL2 `2.42.2-mc.4`
+commit (`267c642`); its version number is unrelated to the WebGPU package's.
+This branch carries neither. A WebGL2 release cut from it would also contain
+the shared runtime changes made for WebGPU:
+
+- surface-material modes are rounded before comparison, which fixes pixels
+  left unmaterialized where the interpolated mode is not exact (SwiftShader
+  shows it; the package test's animated Gold hash changes);
+- image rects carry their surface material in atomics mode (WebGL2 does not
+  use atomics mode; its image-rect instances grow by two attributes);
+- material code is gated on `RIVE_SURFACE_MATERIAL` instead of `RIVE_WEBGL`;
+- the depth-stencil blend condition is rewritten for naga with the same
+  meaning; and
+- `Artboard.draw()` is typed with `RendererBase`, which accepts every
+  renderer it accepted before.

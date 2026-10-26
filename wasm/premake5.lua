@@ -20,7 +20,9 @@ local rendererOption = _OPTIONS['renderer'] or 'c2d'
 RIVE_WITH_CANVAS_2D = rendererOption == 'c2d' or rendererOption == 'c2d_only'
 RIVE_WITH_WEBGL2 = rendererOption == 'webgl2' or rendererOption == 'c2d'
 
-if RIVE_WITH_WEBGL2 then
+RIVE_WITH_WEBGPU = rendererOption == 'webgpu'
+
+if RIVE_WITH_WEBGL2 or RIVE_WITH_WEBGPU then
     dofile(RIVE_PLS_DIR .. '/premake5_pls_renderer.lua')
 end
 
@@ -323,6 +325,24 @@ do
     end
 
     filter({})
+    if RIVE_WITH_WEBGPU then
+        defines({ 'RIVE_WEBGPU_RENDERER' })
+        includedirs({ RIVE_PLS_DIR .. '/include' })
+        links({ 'rive_pls_renderer' })
+        buildoptions({ '--use-port=emdawnwebgpu' })
+        linkoptions({
+            '--use-port=emdawnwebgpu',
+            -- See the c2d filter.
+            '--oformat=js',
+            '--pre-js ' .. path.getabsolute('./js/webgpu_renderer.js'),
+            '-o ' .. path.getabsolute(RIVE_BUILD_OUT) .. '/webgpu_advanced.mjs',
+        })
+        finalizeGlue('webgpu_advanced.mjs')
+        targetname('webgpu_advanced')
+        targetextension('.mjs')
+    end
+
+    filter({})
 end
 
 newoption({
@@ -332,6 +352,7 @@ newoption({
         { 'c2d', 'Canvas2D, delegating what it cannot draw to an internal WebGL2' },
         { 'c2d_only', 'Canvas2D alone, some features unsupported' },
         { 'webgl2', 'WebGL2' },
+        { 'webgpu', 'WebGPU' },
     },
     default = 'c2d',
 })

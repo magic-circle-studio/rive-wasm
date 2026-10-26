@@ -58,6 +58,10 @@ node_modules
 /js/npm/webgl_advanced_single/webgl_advanced_single.mjs
 /js/npm/webgl_advanced/webgl_advanced.mjs
 /js/npm/webgl2_advanced/webgl2_advanced.mjs
+/js/npm/webgpu_advanced/webgpu_advanced.mjs
+/js/npm/webgpu_advanced/webgpu_advanced.mjs.d.ts
+/js/npm/webgpu_advanced/surface_material_shader.mjs
+/js/npm/webgpu_advanced/surface_material_shader.mjs.d.ts
 /js/npm/webgl2_advanced/surface_material_shader.mjs
 /js/npm/webgl2_advanced/surface_material_shader.mjs.d.ts
 /js/examples/**/package-lock.json
@@ -65,3 +69,5 @@ node_modules
 /wasm/examples/**/docs
 /wasm/examples/**/dist
 /wasm/examples/**/package-lock.json
+
+/dist/

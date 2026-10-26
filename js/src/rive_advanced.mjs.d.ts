@@ -195,6 +195,26 @@ export declare class DeferredSession {
 }
 
 /**
+ * What every flavour's native renderer implements (canvas, WebGL2 and WebGPU),
+ * and so what an artboard can draw with.
+ */
+export declare class RendererBase {
+  save(): void;
+  restore(): void;
+  transform(tranform: Mat2D): void;
+  drawPath(path: RenderPath, paint: RenderPaint): void;
+  clipPath(path: RenderPath): void;
+  align(
+    fit: Fit,
+    alignment: Alignment,
+    frame: AABB,
+    content: AABB,
+    scaleFactor?: number,
+  ): void;
+  delete(): void;
+}
+
+/**
  * Rive wrapper around a rendering context for a canvas element, implementing a subset of the APIs
  * from the rendering context interface
  */
@@ -666,7 +686,7 @@ export declare class Artboard {
    * Draws the artboard with a given rendering context.
    * @param renderer - Renderer context to draw with
    */
-  draw(renderer: CanvasRenderer | Renderer): void;
+  draw(renderer: RendererBase): void;
   /**
    * Creates a LinearAnimation for the animation with the given name
    *
@@ -1448,8 +1468,8 @@ export declare class ViewModelInstanceList extends ViewModelInstanceValue {
 export declare class ViewModelInstanceAssetImage extends ViewModelInstanceValue {
   value(image: ImageInternal | null): void;
   /**
-   * Selects the material for this image binding. Image meshes and renderer
-   * fallback draws remain unmaterialized.
+   * Selects the material for this image binding. Image meshes remain
+   * unmaterialized.
    */
   setSurfaceMaterial(material: SurfaceMaterial): void;
 }

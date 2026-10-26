@@ -24,6 +24,7 @@
     "test": "jest",
     "test:scripting": "jest -c jest.scripting.config.js",
     "test:webgl2-package": "node ../wasm/scripts/test_webgl2_package.mjs",
+    "test:webgpu-package": "node ../wasm/scripts/test_webgpu_package.mjs",
     "check:types": "./check_types.sh"
   },
   "keywords": [
