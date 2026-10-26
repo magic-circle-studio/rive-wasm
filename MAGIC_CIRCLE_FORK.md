@@ -4,8 +4,9 @@ This branch builds `@magiccircle/rive-webgl2-advanced` and
 `@magiccircle/rive-webgpu-advanced`. It starts from the
 official `rive-wasm` `2.44.2` tag (`85009a8b`) and its matching
 `rive-runtime` submodule commit (`2a043c31`). The package version is
-`2.44.2-mc.2`. Both repositories replay the Magic Circle changes on these
-upstream bases; the runtime submodule points to the Magic Circle mirror.
+`2.44.2-mc.3` for both packages. Both repositories replay the Magic Circle
+changes on these upstream bases; the runtime submodule points to the Magic
+Circle mirror.
 
 The fork adds:
 
@@ -43,6 +44,10 @@ luminance masks from material tinting.
 Their RGB is premultiplied by the original paint opacity, but upstream reduces
 only their blend alpha. Applying a material using that reduced alpha would erase
 fully additive paints and distort partially additive ones.
+
+`2.44.2-mc.3` rounds interpolated material modes before comparison, fixing
+pixels that could miss their Gold or Rainbow tint. It also adds the WebGPU
+advanced package; both backends share the version and runtime commit.
 
 The original ~21% flush-CPU improvement was measured against 2.42.2-mc.3 on
 one desktop GPU, before the game adopted partial atlas redraws. The 2.44.2
@@ -239,8 +244,9 @@ npm --prefix js run test:webgpu-package
 Like the WebGL2 test, this packs the package, installs the tarball (with its
 `@webgpu/types` dependency, so it needs the npm registry) and drives real
 WebGPU on SwiftShader in headless Chrome; set `CHROME_BIN` if needed. It
-checks the public API, normal/Gold/Rainbow and MSAA rendering, overlay
-preservation, clip rects, eight back-to-back flushes against one flush,
+checks the public API, normal/Gold/Rainbow in atomics and MSAA, inherited
+and explicit image materials in both modes, overlay preservation, clip rects,
+eight back-to-back flushes against one flush,
 texture-backed and browser-decoded images, and re-init after device loss
 with identical pixels. Any WebGPU validation error fails it.
 `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` work as in the WebGL2 test.
@@ -304,23 +310,11 @@ The emptied context object stays alive for the module's lifetime, because
 stale files keep raw factory pointers into it. A voluntary switch to another
 device follows the same rules.
 
-### WebGL2 release state
+### Current release state
 
-Magic Circle ships `@magiccircle/rive-webgl2-advanced@2.42.2-mc.3`, built
-from `ar/2.44.2-msaa-rebase` (`2f9fbfe`): `mc.2` added browser bitmap
-decoding and `mc.3` waits for decoded pixels and types the decode callback as
-`Image | null`. That branch also holds an unpublished WebGL2 `2.42.2-mc.4`
-commit (`267c642`); its version number is unrelated to the WebGPU package's.
-This branch carries neither. A WebGL2 release cut from it would also contain
-the shared runtime changes made for WebGPU:
-
-- surface-material modes are rounded before comparison, which fixes pixels
-  left unmaterialized where the interpolated mode is not exact (SwiftShader
-  shows it; the package test's animated Gold hash changes);
-- image rects carry their surface material in atomics mode (WebGL2 does not
-  use atomics mode; its image-rect instances grow by two attributes);
-- material code is gated on `RIVE_SURFACE_MATERIAL` instead of `RIVE_WEBGL`;
-- the depth-stencil blend condition is rewritten for naga with the same
-  meaning; and
-- `Artboard.draw()` is typed with `RendererBase`, which accepts every
-  renderer it accepted before.
+This branch builds both packages as `2.44.2-mc.3`, following the WebGL2
+`2.44.2-mc.2` fork. It includes that line's bitmap decoding, MSAA CPU
+optimizations, outside-stroke material coordinates, and luminance-mask and
+additive-paint exclusions. The shared runtime adds material-mode rounding,
+WebGPU material shaders and atomics image-rect payloads. Both packages use
+that runtime commit; `Artboard.draw()` accepts their common `RendererBase`.
