@@ -163,6 +163,10 @@ Module["onRuntimeInitialized"] = function () {
   const InBandImageLoader = Module["FileAssetLoader"]["extend"](
     "WebGPUInBandImageLoader",
     {
+      "__construct": function (state) {
+        this["__parent"]["__construct"].call(this);
+        this._state = state;
+      },
       "loadContents": function (assetAddress, bytes) {
         const asset = Module["ptrToAsset"](assetAddress);
         if (!asset["isImage"] || bytes["byteLength"] === 0) {
@@ -170,12 +174,19 @@ Module["onRuntimeInitialized"] = function () {
         }
         // The view aliases wasm memory, which import may grow or reuse.
         const ownedBytes = new Uint8Array(bytes);
-        Module["decodeImage"](ownedBytes, (image) => {
-          if (image) {
-            asset["setRenderImage"](image);
-            image["unref"]();
-          }
-        });
+        const state = this._state;
+        state.decodes.push(new Promise((resolve) => {
+          Module["decodeImage"](ownedBytes, (image) => {
+            try {
+              if (image && !state.abandoned) {
+                asset["setRenderImage"](image);
+              }
+            } finally {
+              if (image) image["unref"]();
+              resolve();
+            }
+          });
+        }));
         return true;
       },
     }
@@ -185,21 +196,35 @@ Module["onRuntimeInitialized"] = function () {
   /**
    * Imports a .riv on the current device. The Rive CDN loader is off by
    * default: CDN images would need native decoders this build omits.
+   * Embedded images finish decoding before the file is returned.
    */
-  Module["load"] = function (bytes, fileAssetLoader, enableRiveAssetCDN = false) {
-    // An executor that throws rejects, so misuse surfaces as a rejection.
-    return new Promise((resolve) => {
-      requireDevice("load");
-      const loader = new Module["FallbackFileAssetLoader"]();
-      if (fileAssetLoader !== undefined && fileAssetLoader !== null) {
-        loader["addLoader"](fileAssetLoader);
-      }
-      loader["addLoader"](new InBandImageLoader());
-      if (enableRiveAssetCDN) {
-        loader["addLoader"](new Module["CDNFileAssetLoader"](null));
-      }
-      resolve(cppLoad(bytes, loader, null));
-    });
+  Module["load"] = async function (bytes, fileAssetLoader, enableRiveAssetCDN = false) {
+    requireDevice("load");
+    const state = { decodes: [], abandoned: false };
+    const loader = new Module["FallbackFileAssetLoader"]();
+    if (fileAssetLoader !== undefined && fileAssetLoader !== null) {
+      loader["addLoader"](fileAssetLoader);
+    }
+    loader["addLoader"](new InBandImageLoader(state));
+    if (enableRiveAssetCDN) {
+      loader["addLoader"](new Module["CDNFileAssetLoader"](null));
+    }
+    let file;
+    try {
+      // Native import calls loadContents synchronously. Keep its file reference
+      // private until every callback that can touch an asset has finished.
+      file = cppLoad(bytes, loader, null);
+    } catch (error) {
+      state.abandoned = true;
+      throw error;
+    }
+    if (!file) {
+      // Import already freed the assets; late callbacks may only release images.
+      state.abandoned = true;
+      return null;
+    }
+    await Promise.allSettled(state.decodes);
+    return file;
   };
 
   const align = Module["Renderer"]["prototype"]["align"];

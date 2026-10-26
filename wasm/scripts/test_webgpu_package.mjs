@@ -20,6 +20,10 @@ const imageBindingFixturePath = join(
   repositoryRoot,
   "wasm/submodules/rive-runtime/tests/unit_tests/assets/data_binding_images_test.riv",
 );
+const embeddedImageFixturePath = join(
+  repositoryRoot,
+  "wasm/submodules/rive-runtime/tests/unit_tests/assets/walle.riv",
+);
 const browserTimeoutMilliseconds = 120_000;
 const hostGPU = process.env.RIVE_TEST_GPU === "host";
 const artboardName = process.env.RIVE_TEST_ARTBOARD ?? null;
@@ -294,6 +298,124 @@ const testPage = String.raw`<!doctype html>
           assert(typeof renderer[name] === "function", "Missing renderer API: " + name);
         }
         assert(throws(() => renderer.clear()), "clear() ran without a target texture.");
+
+        // Hold real browser decodes until explicitly completed. walle.riv has
+        // two embedded images; each pipeline must draw them on its first frame.
+        const embeddedBytes = new Uint8Array(
+          await (await fetch("/embedded-images.riv")).arrayBuffer(),
+        );
+        const originalDecodeImage = rive.decodeImage;
+        const originalPtrToAsset = rive.ptrToAsset;
+        const pendingDecodes = [];
+        let attachments = 0;
+        let releases = 0;
+        rive.decodeImage = (bytes, complete) => pendingDecodes.push({ bytes, complete });
+        rive.ptrToAsset = (address) => {
+          const asset = originalPtrToAsset(address);
+          if (asset.isImage) {
+            const setRenderImage = asset.setRenderImage;
+            asset.setRenderImage = function (image) {
+              attachments++;
+              setRenderImage.call(this, image);
+            };
+          }
+          return asset;
+        };
+        async function completeDecode({ bytes, complete }, invalid = false) {
+          const image = await new Promise((resolveDecode) =>
+            originalDecodeImage(invalid ? new Uint8Array([1, 2, 3]) : bytes, resolveDecode));
+          assert(Boolean(image) === !invalid, "Unexpected embedded decode result.");
+          let imageReleases = 0;
+          if (image) {
+            const unref = image.unref;
+            image.unref = function () {
+              imageReleases++;
+              releases++;
+              unref.call(this);
+            };
+          }
+          complete(image);
+          assert(imageReleases === (image ? 1 : 0),
+            "An embedded decode did not release its image exactly once.");
+        }
+        const embeddedTarget = makeTarget(device);
+        const embeddedImageResults = {};
+        function drawEmbedded(file, samples) {
+          const artboard = file.defaultArtboard();
+          artboard.advance(0);
+          renderer.setTargetTexture(embeddedTarget);
+          renderer.clear(0, samples);
+          renderer.save();
+          renderer.align(rive.Fit.contain, rive.Alignment.center,
+            { minX: 0, minY: 0, maxX: size, maxY: size }, artboard.bounds);
+          artboard.draw(renderer);
+          renderer.restore();
+          renderer.flush();
+          artboard.delete();
+          file.unref();
+        }
+        try {
+          for (const samples of [0, 4]) {
+            let resolved = false;
+            const loading = rive.load(embeddedBytes).then((file) => {
+              resolved = true;
+              return file;
+            });
+            const decodes = pendingDecodes.splice(0);
+            assert(decodes.length === 2, "Expected two embedded image decodes.");
+            await Promise.resolve();
+            assert(!resolved, "load() resolved before embedded images decoded.");
+
+            if (samples === 0) {
+              // An incomplete final varint fails import after image loading
+              // started. It must return null without waiting or touching freed
+              // assets, and must not abandon the concurrent successful load.
+              const malformed = new Uint8Array([...embeddedBytes, 0x80]);
+              let timer;
+              const failed = await Promise.race([
+                rive.load(malformed),
+                new Promise((_, reject) => {
+                  timer = setTimeout(() => reject(new Error(
+                    "Null import waited for embedded decodes.")), 1000);
+                }),
+              ]).finally(() => clearTimeout(timer));
+              assert(failed === null, "Malformed embedded import did not return null.");
+              const abandoned = pendingDecodes.splice(0);
+              assert(abandoned.length > 0, "Null import started no image decodes.");
+              for (const decode of abandoned) await completeDecode(decode);
+              assert(attachments === 0, "A late decode touched a freed asset.");
+              assert(!resolved, "A concurrent load stopped waiting for its images.");
+              embeddedImageResults.abandonedDecodes = abandoned.length;
+            }
+
+            await completeDecode(decodes[0]);
+            await Promise.resolve();
+            assert(!resolved, "load() did not wait for every embedded image.");
+            await completeDecode(decodes[1]);
+            // No extra advance, settling draw or browser task after load().
+            drawEmbedded(await loading, samples);
+            const firstFrame = await readPixels(device, embeddedTarget);
+
+            // Failed browser decodes still resolve the file. Its image-free
+            // pixels are a negative control for the first-frame image check.
+            const withoutImages = rive.load(embeddedBytes);
+            for (const decode of pendingDecodes.splice(0)) await completeDecode(decode, true);
+            drawEmbedded(await withoutImages, samples);
+            const missing = await readPixels(device, embeddedTarget);
+            const imagePixels = countDifferentPixels(firstFrame, missing);
+            assert(imagePixels > 100, "Embedded images were absent on the first frame.");
+            embeddedImageResults[samples === 0 ? "atomics" : "msaa4"] = {
+              imagePixels, firstFrameHash: await sha256(firstFrame),
+            };
+          }
+          embeddedImageResults.attachments = attachments;
+          embeddedImageResults.releases = releases;
+        } finally {
+          rive.decodeImage = originalDecodeImage;
+          rive.ptrToAsset = originalPtrToAsset;
+          renderer.clearTargetTexture();
+          embeddedTarget.destroy();
+        }
 
         const imageBindingFixtureBytes = new Uint8Array(
           await (await fetch("/image-binding-fixture.riv")).arrayBuffer(),
@@ -598,6 +720,7 @@ const testPage = String.raw`<!doctype html>
         finish({
           ok: true,
           adapterInfo,
+          embeddedImageResults,
           imageMaterialDifferences,
           imagePixelHashes,
           evictionPixelHashes,
@@ -674,6 +797,7 @@ async function main() {
       imageBindingFixturePath,
       join(temporaryDirectory, "image-binding-fixture.riv"),
     );
+    await copyFile(embeddedImageFixturePath, join(temporaryDirectory, "embedded-images.riv"));
     await writeFile(join(temporaryDirectory, "index.html"), testPage);
 
     const server = await startServer(temporaryDirectory);

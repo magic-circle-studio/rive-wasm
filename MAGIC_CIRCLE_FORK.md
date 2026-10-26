@@ -199,6 +199,7 @@ never destroys them. Files, artboards, state machines, view models, images
 and surface materials behave as in the WebGL2 package, including image
 materials in atomics mode and the 2.44.2 MSAA fill/stroke and feather-atlas
 shaders. Compatibility devices without vertex storage buffers use MSAA.
+`load()` waits for embedded images to decode and attach before resolving with the file.
 
 ### Build
 
