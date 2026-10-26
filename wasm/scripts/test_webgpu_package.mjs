@@ -1,6 +1,6 @@
 // Packs @magiccircle/rive-webgpu-advanced, installs the tarball into a
-// temporary project and drives it with real WebGPU (SwiftShader) in headless
-// Chrome. Mirrors test_webgl2_package.mjs.
+// temporary project and drives it with WebGPU in headless Chrome.
+// Mirrors test_webgl2_package.mjs. Set RIVE_TEST_GPU=host for the physical GPU.
 import { spawn, spawnSync } from "node:child_process";
 import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -21,6 +21,7 @@ const imageBindingFixturePath = join(
   "wasm/submodules/rive-runtime/tests/unit_tests/assets/data_binding_images_test.riv",
 );
 const browserTimeoutMilliseconds = 120_000;
+const hostGPU = process.env.RIVE_TEST_GPU === "host";
 const artboardName = process.env.RIVE_TEST_ARTBOARD ?? null;
 
 const mimeTypes = new Map([
@@ -179,8 +180,22 @@ const testPage = String.raw`<!doctype html>
       }
 
       async function requestDevice() {
-        const adapter = await navigator.gpu?.requestAdapter();
+        let adapter;
+        // Vulkan initialization can briefly leave the host adapter unavailable.
+        for (let attempt = 0; attempt < 20; attempt++) {
+          adapter = await navigator.gpu?.requestAdapter();
+          if (adapter) break;
+          await new Promise((resolveRetry) => setTimeout(resolveRetry, 100));
+        }
         assert(adapter, "WebGPU is unavailable in the test browser.");
+        if (${JSON.stringify(hostGPU)}) {
+          assert(adapter.info.isFallbackAdapter === false,
+            "Host GPU mode requires a non-fallback adapter.");
+          assert(!/swiftshader|llvmpipe|lavapipe|software/i.test(
+            [adapter.info.vendor, adapter.info.architecture,
+              adapter.info.device, adapter.info.description].join(" ")),
+            "Host GPU mode rejected a software adapter.");
+        }
         const device = await adapter.requestDevice();
         device.addEventListener("uncapturederror", (event) => {
           gpuErrors.push(event.error.message);
@@ -327,6 +342,7 @@ const testPage = String.raw`<!doctype html>
         const imageTarget = makeTarget(device);
         renderer.setTargetTexture(imageTarget);
         const imageMaterialDifferences = {};
+        const imagePixelHashes = {};
         for (const samples of [0, 4]) {
           const images = {};
           for (const [name, globalMaterial, imageMaterial] of [
@@ -359,7 +375,59 @@ const testPage = String.raw`<!doctype html>
           assert(differences.explicitNoneFromGold > 16, "Explicit None did not remove image Gold: " + JSON.stringify(differences));
           assert(differences.explicitGoldFromInherited === 0, "Explicit Gold differs from inherited Gold.");
           assert(differences.explicitRainbow > 16, "Explicit image Rainbow was missing.");
-          imageMaterialDifferences[samples === 0 ? "atomics" : "msaa4"] = differences;
+          const mode = samples === 0 ? "atomics" : "msaa4";
+          imageMaterialDifferences[mode] = differences;
+          imagePixelHashes[mode] = {};
+          for (const [name, pixels] of Object.entries(images)) {
+            imagePixelHashes[mode][name] = await sha256(pixels);
+          }
+        }
+        // More than 32 image views exercise cache eviction. Revisit old views
+        // after eviction and compare one flush with separate overlay flushes.
+        const distinctImages = Array.from({ length: 40 }, (_, index) => {
+          const texture = device.createTexture({
+            size: [1, 1], format: "rgba8unorm",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          });
+          device.queue.writeTexture({ texture },
+            new Uint8Array([index * 6, 255 - index * 5, index * 3, 255]),
+            { bytesPerRow: 4 }, [1, 1]);
+          return { texture, image: rive.makeImageFromWebGPUTexture(texture) };
+        });
+        const imageSequence = [...distinctImages.keys(), 0, 39, 1];
+        const evictionPixelHashes = {};
+        imageBinding.setSurfaceMaterial(rive.SurfaceMaterial.None);
+        function drawImageCell(imageIndex, cellIndex) {
+          imageBinding.value(distinctImages[imageIndex].image);
+          imageBindingArtboard.advance(0);
+          const x = cellIndex % 8 * 32;
+          const y = Math.floor(cellIndex / 8) * 32;
+          renderer.save();
+          renderer.align(rive.Fit.contain, rive.Alignment.center,
+            { minX: x, minY: y, maxX: x + 32, maxY: y + 32 },
+            imageBindingArtboard.bounds);
+          imageBindingArtboard.draw(renderer);
+          renderer.restore();
+        }
+        for (const samples of [0, 4]) {
+          renderer.clear(0, samples);
+          imageSequence.forEach(drawImageCell);
+          renderer.flush();
+          const combined = await readPixels(device, imageTarget);
+          imageSequence.forEach((imageIndex, cellIndex) => {
+            if (cellIndex === 0) renderer.clear(0, samples);
+            else renderer.beginOverlayFrame(samples);
+            drawImageCell(imageIndex, cellIndex);
+            renderer.flush();
+          });
+          assert(countOpaquePixels(combined) > 0, "Image eviction atlas is empty.");
+          assert(countDifferentPixels(combined, await readPixels(device, imageTarget)) === 0,
+            "Image cache eviction changed pixels.");
+          evictionPixelHashes[samples === 0 ? "atomics" : "msaa4"] = await sha256(combined);
+        }
+        for (const { texture, image } of distinctImages) {
+          image.unref();
+          texture.destroy();
         }
         renderer.clearTargetTexture();
         imageTarget.destroy();
@@ -531,6 +599,10 @@ const testPage = String.raw`<!doctype html>
           ok: true,
           adapterInfo,
           imageMaterialDifferences,
+          imagePixelHashes,
+          evictionPixelHashes,
+          atlasHash: await sha256(oneFlush),
+          clipHash: await sha256(clipped),
           opaquePixels,
           materialDifferences,
           staticMaterialDifferences,
@@ -612,11 +684,20 @@ async function main() {
         "--no-sandbox",
         "--disable-dev-shm-usage",
         "--enable-unsafe-webgpu",
-        "--enable-features=Vulkan",
-        "--use-vulkan=swiftshader",
-        "--use-webgpu-adapter=swiftshader",
-        "--use-angle=swiftshader",
-        "--enable-unsafe-swiftshader",
+        ...(hostGPU ? [
+          "--enable-gpu",
+          "--use-gl=angle",
+          "--use-angle=vulkan",
+          "--enable-features=Vulkan,VulkanFromANGLE",
+          "--disable-vulkan-surface",
+          "--collect-dawn-info-eagerly",
+        ] : [
+          "--enable-features=Vulkan",
+          "--use-vulkan=swiftshader",
+          "--use-webgpu-adapter=swiftshader",
+          "--use-angle=swiftshader",
+          "--enable-unsafe-swiftshader",
+        ]),
         `--user-data-dir=${join(temporaryDirectory, "chrome-profile")}`,
         server.url,
       ],
@@ -649,6 +730,9 @@ async function main() {
           `Packed browser test failed: ${result.error}\n` +
             `${result.browserMessages?.join("\n") ?? ""}`,
         );
+      }
+      if (process.env.RIVE_TEST_RESULT) {
+        await writeFile(process.env.RIVE_TEST_RESULT, JSON.stringify(result, null, 2) + "\n");
       }
       console.log("Packed WebGPU browser test passed:", result);
     } finally {

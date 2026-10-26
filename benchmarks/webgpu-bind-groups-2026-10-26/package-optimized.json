@@ -1,0 +1,87 @@
+{
+  "ok": true,
+  "adapterInfo": {
+    "vendor": "nvidia",
+    "architecture": "turing",
+    "device": "",
+    "description": "",
+    "isFallbackAdapter": false
+  },
+  "imageMaterialDifferences": {
+    "atomics": {
+      "inheritedGold": 24064,
+      "explicitNoneFromGold": 2399,
+      "explicitGoldFromInherited": 0,
+      "explicitRainbow": 2399
+    },
+    "msaa4": {
+      "inheritedGold": 23552,
+      "explicitNoneFromGold": 2398,
+      "explicitGoldFromInherited": 0,
+      "explicitRainbow": 2398
+    }
+  },
+  "imagePixelHashes": {
+    "atomics": {
+      "normal": "21d512a2d1baf74391bcef60b9a4ba05add468b3c0cc240a2b11fe00e98ff43e",
+      "inheritedGold": "6f59bce4ea538a1624a92ea39c84bf5bf84b26e19debd76eed0a12dbb3704414",
+      "explicitNone": "f536c2ae3fc523a8ef93d152db0767dce62da387057e2e0aa4e111789d167d9b",
+      "explicitGold": "6f59bce4ea538a1624a92ea39c84bf5bf84b26e19debd76eed0a12dbb3704414",
+      "explicitRainbow": "6b24a1f0373f8ac62c46b5787cd936f8cefd217425624b5150dc22703f62c1f2"
+    },
+    "msaa4": {
+      "normal": "2bda31ae88b92198dde3f77d13ea87df21d9d2751a6b7080bd313fd110b1d009",
+      "inheritedGold": "852df247519a344a9ffb0a6ac38315a65ea488e203265cfda977e664ed0faf66",
+      "explicitNone": "007fa03ba3d25594eda7fecb46facab89faec0a5018533cb30bb5fa8c620aa3c",
+      "explicitGold": "852df247519a344a9ffb0a6ac38315a65ea488e203265cfda977e664ed0faf66",
+      "explicitRainbow": "54ac4aa54454d52c0499a51ddcee12dc92717b54c0189e594e571d01518cb0d0"
+    }
+  },
+  "evictionPixelHashes": {
+    "atomics": "7405c30940a2457ccdb7876ec566e6f4ae0d64403d700464d7729cdab7d86ad3",
+    "msaa4": "fc27feb4de93d8aeef6e4cfc50fe2da5f9b3362d04ed171bf6d2070400d53c92"
+  },
+  "atlasHash": "5da30d0014b24bcb480c40254a5267ee8199a9c8afb403d505418db41f827fb8",
+  "clipHash": "6632cd80dd3ff9b37083d74875a60b831e5a994c30eb19ad95557c82ff15e754",
+  "opaquePixels": {
+    "normal": 32356,
+    "normalMsaa4": 32254,
+    "goldMsaa4": 32254,
+    "rainbowMsaa4": 32254,
+    "gold": 32356,
+    "goldStaticA": 32356,
+    "goldStaticB": 32356,
+    "rainbow": 32356,
+    "rainbowStaticA": 32356,
+    "rainbowStaticB": 32356
+  },
+  "materialDifferences": {
+    "goldMsaa4FromNormal": 32254,
+    "rainbowMsaa4FromNormal": 30196,
+    "goldFromNormal": 32355,
+    "rainbowFromNormal": 30434,
+    "goldFromRainbow": 32355
+  },
+  "staticMaterialDifferences": {
+    "gold": 0,
+    "rainbow": 0
+  },
+  "clipPixels": {
+    "inside": 15900,
+    "outside": 0
+  },
+  "flushDifferences": 0,
+  "reinitMatches": true,
+  "pixelHashes": {
+    "normal": "4f42cd96978b40c8244459386b02e6c0ec4886c2137f9b135723ebb1e045bd61",
+    "normalMsaa4": "d768a0cc88e5587dd5eb65f7ebfb70519cffcd0a8d28e81a47b7a1458a01d637",
+    "goldMsaa4": "982c01c5ce024f0f3621e407e162f553b80c9487e61f92a55caf1d1b13900ae8",
+    "rainbowMsaa4": "b7163c7af18d1e9116f67e7cda3f2a1951da22fc7a1b3c9677ecda5203c6049c",
+    "gold": "1f25b118377d5909bd3747b6a6fd297afeb20502ac168c91574a6e5888ec243a",
+    "goldStaticA": "844017688a2a4944c410a6d53c67f5bb1548b50e088bc009eba00f628ce7a4d2",
+    "goldStaticB": "844017688a2a4944c410a6d53c67f5bb1548b50e088bc009eba00f628ce7a4d2",
+    "rainbow": "24420fb36af24073a2b1bee7c836fc87b23c562ed57fbb2c5f3ababc13fdfd42",
+    "rainbowStaticA": "24420fb36af24073a2b1bee7c836fc87b23c562ed57fbb2c5f3ababc13fdfd42",
+    "rainbowStaticB": "24420fb36af24073a2b1bee7c836fc87b23c562ed57fbb2c5f3ababc13fdfd42"
+  }
+}

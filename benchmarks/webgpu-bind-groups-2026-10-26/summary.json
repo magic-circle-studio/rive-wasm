@@ -1,0 +1,83 @@
+{
+  "flushCpuMs": {
+    "baseline": 0.9076249993509716,
+    "optimized": 0.7573888889617391
+  },
+  "reductionPercent": 16.55266332424339,
+  "bindGroupsPerFlush": {
+    "baseline": [
+      107,
+      107,
+      107,
+      107,
+      107,
+      107,
+      107,
+      107,
+      107,
+      107,
+      107,
+      107
+    ],
+    "optimized": [
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5
+    ]
+  },
+  "reductionPercent95Interval": [
+    15.903798158056881,
+    17.20191485814605
+  ],
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 2060 SUPER",
+    "driver": "595.104.02",
+    "cpu": "AMD Ryzen 9 5900X 12-Core Processor",
+    "browser": "154.0.8037.57",
+    "platform": "linux 7.2.8"
+  },
+  "framesPerBuild": 1440,
+  "renderPassesPerFlush": 105,
+  "dominantDescriptorCreationsPerFlush": {
+    "baseline": 103,
+    "optimized": 1
+  },
+  "atlasPixelComparisons": 10,
+  "changedPixelBytes": 0,
+  "webgpuValidationErrors": [],
+  "packageResultsIdentical": true,
+  "baselineParentCommit": "dc6709ec336ad4fc4b33f4a1275b2c1308e38db8",
+  "baselineRuntimeCommit": "95f95fa053845cafd5a8d648da1ca50ca160ac45",
+  "buildCommand": "wasm/build_webgpu.sh -i -r webgl2,webgpu",
+  "webgl2ArtifactsUnchanged": true,
+  "packageVersion": "2.44.2-mc.3",
+  "packageTarball": "dist/magiccircle-rive-webgpu-advanced-2.44.2-mc.3.tgz",
+  "packageSha256": "eabd5d191acd7566608e232519abd749903ff1730bad8c6125c9c9b5d09d37dc",
+  "buildHashes": {
+    "baseline": {
+      "rive.wasm": "3bb4002e3f45e7e2f9a0d6a08884d5fe206b6b0bd0c0d0b2816ecef2d75b4c04",
+      "webgpu_advanced.mjs": "a4a64fe76572e16d3623604b5c2c4311e04cab196d764ae0014d79d4262c0277"
+    },
+    "optimized": {
+      "rive.wasm": "840db03a138e12dd581ca203a94ece23cc7fa11861fe20f9b20c406b6fe90a22",
+      "webgpu_advanced.mjs": "a4a64fe76572e16d3623604b5c2c4311e04cab196d764ae0014d79d4262c0277"
+    }
+  },
+  "fixtureSha256": "ca73f18ee9a6a2a308f6aa624410a0575ac769014ff930f63ebe11636bdd67bc",
+  "optimizedRuntimeCommit": "6cdbce515133f013a0c8ddbf77ae12f99bfbc45d",
+  "confidenceIntervalMethod": "20,000 paired block-mean bootstrap resamples across 24 blocks; random seed 42666; percentile 95% interval.",
+  "webgl2ArtifactSha256": {
+    "js/npm/webgl2_advanced/rive.wasm": "db5479a6d72f1e6ab4f04675ee756f71d7e5b7565faa4f53f380b62940762fda",
+    "js/npm/webgl2_advanced/rive_fallback.wasm": "ffa98cc6ee9a8f940e29a1a029b8edd52e66f46ff42e34233fee8b8605cc9626",
+    "js/npm/webgl2_advanced/webgl2_advanced.mjs": "cf1cc169cf5844a814339876a04fc7333428e2b3526f2b75d62a254f04174b6a"
+  }
+}

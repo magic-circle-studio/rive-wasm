@@ -249,6 +249,7 @@ and explicit image materials in both modes, overlay preservation, clip rects,
 eight back-to-back flushes against one flush,
 texture-backed and browser-decoded images, and re-init after device loss
 with identical pixels. Any WebGPU validation error fails it.
+Set `RIVE_TEST_GPU=host` to use the physical GPU through ANGLE/Vulkan, retry adapter discovery briefly, and reject fallback/software adapters.
 `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` work as in the WebGL2 test.
 
 ### Differences from the WebGL2 package
