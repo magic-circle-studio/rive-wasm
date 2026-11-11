@@ -20,8 +20,9 @@ The fork adds:
 - `tryFlush()` for consuming a recorded frame without drawing until its
   shaders finish linking in the background, and overlay `clearRect()` for
   clearing atlas regions only when the frame draws. `flush()` remains
-  blocking and also applies the recorded rectangles. The experiment switch
-  `setExactProgramsEnabled(false)` uses only family ubershaders.
+  blocking and also applies the recorded rectangles. `setExactProgramsEnabled(false)`
+  draws with each family's ubershader only, so no exact variant is linked
+  or first drawn later.
 
 `2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
 decoding before invoking `decodeImage`'s callback, reports invalid images as
