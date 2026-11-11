@@ -3,7 +3,7 @@
 This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
 official `rive-wasm` `2.42.2` tag (`dc4d3a12`) and the matching
 `rive-runtime` `runtime-v0.1.411` tag (`30742b4c`). The package version is
-`2.42.2-mc.3`. Both repositories replay the Magic Circle changes on these
+`2.42.2-mc.4`. Both repositories replay the Magic Circle changes on these
 upstream bases; the runtime submodule points to the Magic Circle mirror.
 
 The fork adds:
@@ -13,10 +13,15 @@ The fork adds:
 - wrapping a WebGL texture as a Rive image;
 - deformation-aware animated/static Gold and static Rainbow materials;
 - per-image material overrides and worker-safe OffscreenCanvas creation;
-- a generated JavaScript export of the same material shader source; and
+- a generated JavaScript export of the same material shader source;
 - asynchronous ImageBitmap decoding before the first image upload, with
   premultiplied alpha, bitmap cleanup, and an HTMLImageElement fallback for
-  later contexts or browsers that cannot decode a bitmap.
+  later contexts or browsers that cannot decode a bitmap; and
+- `tryFlush()` for consuming a recorded frame without drawing until its
+  shaders finish linking in the background, and overlay `clearRect()` for
+  clearing atlas regions only when the frame draws. `flush()` remains
+  blocking and also applies the recorded rectangles. The experiment switch
+  `setExactProgramsEnabled(false)` uses only family ubershaders.
 
 `2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
 decoding before invoking `decodeImage`'s callback, reports invalid images as

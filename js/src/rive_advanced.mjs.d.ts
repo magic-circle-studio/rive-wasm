@@ -234,6 +234,22 @@ export declare class RendererWrapper {
   delete(): void;
   flush(): void;
   /**
+   * Draws the recorded WebGL2 frame only if every program it needs has finished
+   * linking. Otherwise draws nothing, leaves the target untouched, starts the
+   * missing links in the background, and returns how many programs are pending.
+   * Returns 0 when drawn. Either way the recorded frame is consumed, as with
+   * flush(). Without KHR_parallel_shader_compile this is flush() and returns 0.
+   */
+  tryFlush(): number;
+  /**
+   * WebGL2 overlay frames only. Records a target rectangle, in saveClipRect
+   * coordinates, to clear to transparent before this frame's draws. A frame
+   * that tryFlush() does not draw clears nothing. Full-clear frames ignore it.
+   */
+  clearRect(left: number, top: number, right: number, bottom: number): void;
+  /** Experiment: when false, never create exact programs; use ubershaders. */
+  setExactProgramsEnabled(enabled: boolean): void;
+  /**
    * Re-binds Rive's internal textures and invalidates the GL state
    * cache. Call before Rive renders when another renderer (e.g.
    * PixiJS) has been using the shared WebGL context.
