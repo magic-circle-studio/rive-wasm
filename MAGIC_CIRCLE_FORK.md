@@ -24,7 +24,7 @@ The fork adds:
   cached as a bitmap (`BitmapCache`, which no Magic Circle file uses) flushes
   the target mid-frame, so neither guarantee holds for that frame; and
 - an ubershader-only WebGL2 renderer, cached image quads in depth-stencil mode,
-  and per-draw opt-in path material/HSL and image-paint features. Plain and
+  and per-draw opt-in clip-rect, material/HSL and image-paint features. Plain and
   material paths use separate batches. Image meshes switch materials through
   fragment uniforms without adding vertex data; plain meshes upload no material
   uniforms except a mode reset after a materialized mesh.
@@ -97,7 +97,8 @@ Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 Set `RIVE_TEST_GAME_ROOT` to the Magic Circle game checkout and
 `PLAYWRIGHT_MODULE` to an installed Playwright module to include the 209-case
 content check on the packed package. It calls `linkDrawPrograms()` immediately
-after creation, requires all five programs to be linked, and rejects further
+after creation, requires six programs plus five clip-rect variants where clip
+planes are supported to be linked, and rejects further
 draw-program links with parallel compilation available and hidden. It uses the
 host GPU; changes to shipped content that need another program fail this check.
 

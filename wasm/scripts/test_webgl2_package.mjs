@@ -580,12 +580,15 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         for (const hideParallel of [false, true]) {
           const eager = makeTarget({ hideParallel });
           eager.linkPrograms();
-          assert(eager.programs.filter((program) => program.draw).length === 5 &&
-            eager.programs.filter((program) => program.draw).every((program) => program.complete),
-            "linkDrawPrograms did not synchronously finish Magic Garden's five programs.");
+          const drawPrograms = eager.programs.filter((program) => program.draw);
+          const clipped = drawPrograms.some((program) => hasDefine(program.source, "ENABLE_CLIP_RECT"));
+          assert(drawPrograms.length === (clipped ? 11 : 6) &&
+            drawPrograms.every((program) => program.complete),
+            "linkDrawPrograms did not synchronously finish Magic Garden's programs and supported clip variants.");
           const links = eager.programs.length;
           eager.linkPrograms();
-          for (const options of [{ mix: true }, { material: 1, mixedMaterials: true }]) {
+          for (const options of [{ mix: true }, { material: 1, mixedMaterials: true },
+            { quad: true, material: 1, box: [0, 0, 128, 128] }]) {
             eagerReference.block(options);
             assert(eager.attempt(options) === 0, "Prelinked frame reported a pending draw program.");
             assert(countDifferentPixels(eagerReference.pixels(), eager.pixels()) === 0,
