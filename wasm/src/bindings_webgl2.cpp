@@ -559,11 +559,6 @@ public:
         }
     }
 
-    void setExactProgramsEnabled(bool enabled)
-    {
-        renderContextGL()->setExactProgramsEnabled(enabled);
-    }
-
     void setSurfaceMaterial(uint32_t value,
                             float l,
                             float t,
@@ -674,38 +669,32 @@ public:
         }
     }
 
-    void flush()
+    void flush() { std::ignore = flushFrame(false); }
+
+    size_t tryFlush() { return flushFrame(true); }
+
+private:
+    size_t flushFrame(bool tryPrograms)
     {
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)
         if (m_session != nullptr)
         {
             deferredFlush();
-            return;
-        }
-#endif
-        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
-        m_renderContext->flush({.renderTarget = activeRenderTarget(),
-                                .clearRects = m_clearRects});
-        m_clearRects.clear();
-        WebGL2Factory::Instance()->bindActiveRenderer(nullptr);
-#ifdef RIVE_CANVAS
-        // The frame is over, so nothing is still compositing through these.
-        m_compositeRenderers.clear();
-#endif
-    }
-
-    size_t tryFlush()
-    {
-#if defined(RIVE_CANVAS) && defined(RIVE_ORE)
-        if (m_session != nullptr)
-        {
-            flush();
             return 0;
         }
 #endif
         ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
-        size_t pending = m_renderContext->tryFlush(
-            {.renderTarget = activeRenderTarget(), .clearRects = m_clearRects});
+        RenderContext::FlushResources resources = {
+            .renderTarget = activeRenderTarget(), .clearRects = m_clearRects};
+        size_t pending = 0;
+        if (tryPrograms)
+        {
+            pending = m_renderContext->tryFlush(resources);
+        }
+        else
+        {
+            m_renderContext->flush(resources);
+        }
         m_clearRects.clear();
         WebGL2Factory::Instance()->bindActiveRenderer(nullptr);
 #ifdef RIVE_CANVAS
@@ -714,6 +703,7 @@ public:
         return pending;
     }
 
+public:
     /**
      * Set an external WebGL texture as the render target. When set,
      * clear()/beginOverlayFrame()/flush() render to this texture
@@ -1314,7 +1304,8 @@ bool sessionRecordedThisFrame(WebGL2DeferredSession* session)
 
 WebGL2Renderer* makeWebGL2Renderer(int width, int height)
 {
-    if (auto renderContext = RenderContextGLImpl::MakeContext())
+    if (auto renderContext = RenderContextGLImpl::MakeContext(
+            {.shaderCompilationMode = ShaderCompilationMode::onlyUbershaders}))
     {
         return new WebGL2Renderer(std::move(renderContext), width, height);
     }
@@ -1389,7 +1380,6 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
         .function("flush", &WebGL2Renderer::flush)
         .function("tryFlush", &WebGL2Renderer::tryFlush)
         .function("clearRect", &WebGL2Renderer::clearRect)
-        .function("setExactProgramsEnabled", &WebGL2Renderer::setExactProgramsEnabled)
         .function("resize", &WebGL2Renderer::resize)
         .function("saveClipRect", &WebGL2Renderer::saveClipRect)
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)

@@ -214,6 +214,8 @@ export declare class RendererWrapper {
    */
   restore(): void;
   transform(tranform: Mat2D): void;
+  /** Multiplies opacity for subsequent draws within the saved state. */
+  modulateOpacity(opacity: number): void;
   drawPath(path: RenderPath, paint: RenderPaint): void;
   clipPath(path: RenderPath): void;
   /**
@@ -247,13 +249,6 @@ export declare class RendererWrapper {
    * that tryFlush() does not draw clears nothing. Full-clear frames ignore it.
    */
   clearRect(left: number, top: number, right: number, bottom: number): void;
-  /**
-   * When false, draws use each shader family's all-features program and exact
-   * variants are never created. Call it before the first draw. An exact
-   * variant drops a few branches and varyings, but each one is another
-   * program to link, and to build a pipeline for, when it is first used.
-   */
-  setExactProgramsEnabled(enabled: boolean): void;
   /**
    * Re-binds Rive's internal textures and invalidates the GL state
    * cache. Call before Rive renders when another renderer (e.g.

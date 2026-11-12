@@ -1,9 +1,10 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { findChrome, parseShaderMacros } from "./webgl2_test_support.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, "../..");
@@ -19,10 +20,7 @@ const imageBindingFixturePath = join(
 );
 const shaderExports = await readFile(join(repositoryRoot,
   "wasm/build/webgl2_advanced/bin/release/include/generated/shaders/glsl.glsl.exports.h"), "utf8");
-const shaderMacros = Object.fromEntries(Array.from(
-  shaderExports.matchAll(/^#define GLSL_(\w+) "([^"]+)"$/gm),
-  ([, name, value]) => [name, value],
-));
+const shaderMacros = parseShaderMacros(shaderExports);
 const resultMarker = "RIVE_PACKAGE_TEST_RESULT";
 const legacyComparison = process.env.RIVE_TEST_LEGACY === "1";
 const artboardName = process.env.RIVE_TEST_ARTBOARD ?? null;
@@ -34,23 +32,6 @@ const mimeTypes = new Map([
   [".riv", "application/octet-stream"],
   [".wasm", "application/wasm"],
 ]);
-
-/** Finds a Chrome-compatible browser for the real-WebGL package test. */
-function findBrowser() {
-  const candidates = [
-    process.env.CHROME_BIN,
-    "google-chrome",
-    "chromium",
-    "chromium-browser",
-  ].filter(Boolean);
-  for (const candidate of candidates) {
-    const result = spawnSync("which", [candidate], { encoding: "utf8" });
-    if (result.status === 0) {
-      return result.stdout.trim();
-    }
-  }
-  throw new Error("Chrome was not found. Set CHROME_BIN to its executable.");
-}
 
 /** Runs a child process and returns its captured output. */
 function run(command, args, options = {}) {
@@ -119,6 +100,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
     <pre id="result">pending</pre>
     <canvas id="canvas" width="256" height="256"></canvas>
     <script type="module">
+      import { pathFixture } from "/webgl2_test_support.mjs";
       const result = document.querySelector("#result");
       const browserMessages = [];
       for (const method of ["error", "warn"]) {
@@ -138,7 +120,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         "setSurfaceMaterial",
       ];
       if (!${JSON.stringify(legacyComparison)}) {
-        apiNames.push("bindContext", "tryFlush", "clearRect", "setExactProgramsEnabled");
+        apiNames.push("bindContext", "tryFlush", "clearRect");
       }
 
       function finish(payload) {
@@ -217,72 +199,9 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
 
       // Write tiny, deterministic RIVE v7 fixtures using generated core keys.
       // This keeps normal, screen, and feather paths independent of art assets.
-      function pathFixture({ screen = false, feather = false, meshPNG = null, imagePNG = null, pathReference = false, unitMesh = false } = {}) {
-        const bytes = [...new TextEncoder().encode("RIVE"), 7, 0, 0, 0];
-        const uint = (value) => {
-          do {
-            const byte = value & 127;
-            value >>>= 7;
-            bytes.push(byte | (value ? 128 : 0));
-          } while (value);
-        };
-        const prop = (key, value, type = "uint") => {
-          uint(key);
-          if (type === "uint") uint(value);
-          else if (type === "bytes") { uint(value.length); bytes.push(...value); }
-          else {
-            const buffer = new ArrayBuffer(4);
-            const view = new DataView(buffer);
-            if (type === "color") view.setUint32(0, value, true);
-            else view.setFloat32(0, value, true);
-            bytes.push(...new Uint8Array(buffer));
-          }
-        };
-        uint(23); uint(0); // Backboard.
-        const imageBytes = pathReference ? null : meshPNG ?? imagePNG;
-        if (imageBytes) {
-          uint(105); prop(204, 0); prop(208, 32, "float"); prop(207, 32, "float"); uint(0);
-          uint(106); prop(212, imageBytes, "bytes"); uint(0);
-        }
-        uint(1); prop(7, 256, "float"); prop(8, 256, "float"); uint(0);
-        if (imagePNG && pathReference) {
-          uint(3); prop(5, 0); prop(13, 176, "float"); prop(14, 176, "float"); uint(0);
-          uint(7); prop(5, 1); prop(20, 32, "float"); prop(21, 32, "float");
-          prop(123, 0, "float"); prop(124, 0, "float"); uint(0);
-          uint(20); prop(5, 1); uint(0);
-          // The flat PNG is equivalent to this solid-color path.
-          uint(18); prop(5, 3); prop(37, 0x80e03080, "color"); uint(0);
-          return new Uint8Array(bytes);
-        }
-        if (imageBytes) {
-          uint(100); prop(5, 0); prop(206, 0); prop(13, 176, "float"); prop(14, 176, "float"); prop(380, 0, "float"); prop(381, 0, "float"); uint(0);
-          if (imagePNG) return new Uint8Array(bytes);
-          uint(109); prop(5, 1); prop(223, [0, 1, 2, 0, 2, 3], "bytes"); uint(0);
-          const vertices = unitMesh
-            ? [[0, 0, 0, 0], [32, 0, 1, 0], [32, 32, 1, 1], [0, 32, 0, 1]]
-            : [[-32, -32, 0, 0], [32, -32, 1, 0], [32, 32, 1, 1], [-32, 32, 0, 1]];
-          for (const [x, y, u, v] of vertices) {
-            uint(108); prop(5, 2); prop(24, x, "float"); prop(25, y, "float");
-            prop(215, u, "float"); prop(216, v, "float"); uint(0);
-          }
-          return new Uint8Array(bytes);
-        }
-        uint(3); prop(5, 0); prop(13, 48, "float"); prop(14, 64, "float"); uint(0);
-        uint(7); prop(5, 1); prop(20, 48, "float"); prop(21, 32, "float"); uint(0);
-        uint(20); prop(5, 1);
-        if (feather) prop(40, 2); // FillRule::clockwise is required for feather fills.
-        if (screen) prop(747, 14); // BlendMode::screen.
-        uint(0);
-        uint(18); prop(5, 3); prop(37, 0xffe04080, "color"); uint(0);
-        if (feather) {
-          uint(533); prop(5, 3); prop(749, 8, "float"); uint(0);
-        }
-        return new Uint8Array(bytes);
-      }
-
       async function testDeferredFlush(rive, png) {
         const macros = ${JSON.stringify(shaderMacros)};
-        const report = { passed: [], parallel: false, constructorExclusions: ["color ramp", "tessellation"] };
+        const report = { passed: [], parallel: false };
         // dump-dom's virtual clock can withhold rAF on an idle page. Keep a
         // timer watchdog so the same retry checks also complete in CI.
         report.animationFrames = 0;
@@ -324,7 +243,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         function hasDefine(source, name) {
           return source.includes("#define " + macros[name] + " true\n");
         }
-        function makeTarget({ hideParallel = false, exact = true } = {}) {
+        function makeTarget({ hideParallel = false } = {}) {
           const canvas = document.createElement("canvas");
           canvas.width = canvas.height = 256;
           const gl = canvas.getContext("webgl2", {
@@ -334,9 +253,6 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           assert(gl, "Deferred test has no WebGL2 context.");
           const extension = gl.getExtension("KHR_parallel_shader_compile");
           const parallel = !!extension && !hideParallel;
-          const rendererInfo = gl.getExtension("WEBGL_debug_renderer_info");
-          const systemRenderer = gl.getParameter(rendererInfo?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER);
-          const clipPlanes = !!gl.getExtension("WEBGL_clip_cull_distance") && !systemRenderer.includes("ANGLE");
           report.parallel ||= parallel;
           const programs = [];
           const sources = new Map();
@@ -345,7 +261,6 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           let call = 0;
           let phase = "constructor";
           let issued = false;
-          let deferredExactLinked = false;
           let gate = false;
           let activeProgram = null;
           const usedPrograms = [];
@@ -368,13 +283,13 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           });
           for (const name of ["clear", "drawArrays", "drawElements", "drawArraysInstanced", "drawElementsInstanced", "blitFramebuffer"]) {
             wrap(name, (original, ...args) => {
-              assert(!parallel || phase === "constructor" || !deferredExactLinked,
-                "A draw or clear followed an end-of-frame exact link.");
               if (name.startsWith("draw") && activeProgram?.draw) usedPrograms.push(activeProgram);
               issued = true; return original(...args);
             });
           }
           wrap("linkProgram", (original, program) => {
+            assert(!parallel || phase !== "try" || !issued,
+              "Issue pass submitted a program link.");
             const shaders = attached.get(program).map((shader) => sources.get(shader));
             const source = shaders.join("\n");
             const fragment = shaders.find((source) =>
@@ -383,17 +298,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             const atlas = hasDefine(source, "ATLAS_FEATHERED_FILL") || hasDefine(source, "ATLAS_FEATHERED_STROKE");
             const family = programs.length === 2 ? "blit" : atlas ? "feather" : hasDefine(source, "DRAW_IMAGE_MESH") ? "image"
               : hasDefine(fragment, "ENABLE_ADVANCED_BLEND") || hasDefine(fragment, "ENABLE_KHR_BLEND") ? "screen" : "normal";
-            const supportsVariants = ["DRAW_PATH", "DRAW_IMAGE_MESH", "DRAW_INTERIOR_TRIANGLES", "FEATHER_ATLAS_BLIT"]
-              .some((name) => hasDefine(source, name));
-            // Path H is opt-in; account for Rive's ANGLE clip-plane workaround.
-            const uber = !supportsVariants || (family === "image"
-              ? hasDefine(fragment, "ENABLE_HSL_BLEND_MODES")
-              : hasDefine(fragment, "ENABLE_DITHER") &&
-                (!clipPlanes || hasDefine(source, "ENABLE_CLIP_RECT")));
-            assert(!parallel || phase !== "try" || !issued || !uber,
-              "Issue pass submitted an ubershader link.");
-            if (parallel && phase !== "constructor" && issued && draw && !uber) deferredExactLinked = true;
-            programs.push({ program, source, family, uber, draw: draw && !atlas, atlas,
+            programs.push({ program, source, family, draw: draw && !atlas, atlas,
               excluded: programs.length < 2, complete: false, polls: new Map(), phase });
             return original(program);
           });
@@ -415,10 +320,6 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
               if (!gate || blockedFamilies.has(item.family)) return false;
               item.complete ||= ready;
               return ready;
-            }
-            if (item && parameter === gl.LINK_STATUS && phase === "blocking") {
-              item.drawLinksAtLinkStatus = programs.filter((program) => program.draw).length;
-              item.exactLinksAtLinkStatus = programs.filter((program) => program.draw && !program.uber).length;
             }
             blocking("getProgramParameter(" + parameter + ")", program);
             return original(program, parameter);
@@ -446,7 +347,6 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           const renderer = rive.makeRenderer(canvas);
           assert(renderer, "Deferred renderer creation failed.");
           assert(programs.length === 3, "Expected color ramp, tessellation, and prelinked blit at creation.");
-          renderer.setExactProgramsEnabled(exact);
           renderer.bindContext();
           const target = makeTexture(gl, 256, 256);
           renderer.setTargetTexture(target, 256, 256);
@@ -455,7 +355,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             return readTexturePixels(gl, target, 256, 256);
           };
           function seed() {
-            phase = "seed"; issued = false; deferredExactLinked = false;
+            phase = "seed"; issued = false;
             renderer.bindContext(); renderer.unbindGLInternalResources();
             const fb = gl.createFramebuffer();
             gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
@@ -464,10 +364,11 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             gl.clearColor(0.1, 0.4, 0.7, 1); gl.clear(gl.COLOR_BUFFER_BIT);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb);
           }
-          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0, mixedMaterials = false } = {}) {
+          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0, mixedMaterials = false, modulatedOpacity = 1 } = {}) {
             renderer.bindContext(); renderer.invalidateGLState();
             overlay ? renderer.beginOverlayFrame() : renderer.clear();
             renderer.setSurfaceMaterial(material, 0, 0, 256, 256, -1);
+            renderer.save(); renderer.modulateOpacity(modulatedOpacity);
             usedPrograms.length = 0;
             if (overlay && clear) renderer.clearRect(12, 36, 92, 100);
             if (mix) {
@@ -493,9 +394,10 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
                 renderer.restore();
               }
             }
+            renderer.restore();
           }
           function attempt(options) {
-            phase = "try"; issued = false; deferredExactLinked = false; ++call; record(options);
+            phase = "try"; issued = false; ++call; record(options);
             const pending = renderer.tryFlush();
             assert(violations.length === 0, "Blocking link queries: " + violations.join(", "));
             return pending;
@@ -512,7 +414,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             get imageMaterialWrites() { return imageMaterialWrites; },
             attempt, untilDrawn, setGate: (open) => { gate = open; },
             block(options) {
-              phase = "blocking"; issued = false; deferredExactLinked = false;
+              phase = "blocking"; issued = false;
               ++call; record(options); renderer.flush();
             },
             destroy() {
@@ -546,49 +448,17 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         blocking.block();
         assert(countDifferentPixels(drawn, blocking.pixels()) === 0, "Deferred pixels differ from blocking flush().");
         report.passed.push("path retry and pixels", "completion gates and once-per-call polls");
-        // A blocking family miss submits only the uber before its LINK_STATUS.
-        const drawPrograms = blocking.programs.filter((program) => program.draw);
-        assert(drawPrograms.length > 0, "Blocking frame linked no draw programs.");
-        if (blocking.parallel) {
-          const blockingUbers = drawPrograms.filter((program) => program.uber);
-          assert(blockingUbers.length === 1, "The blocking fixture must exercise one draw-program family.");
-          assert(blockingUbers[0].drawLinksAtLinkStatus === 1,
-            "Blocking ubershader LINK_STATUS waited behind another draw-program link.");
-          assert(blockingUbers[0].exactLinksAtLinkStatus === 0,
-            "Blocking flush submitted an exact program ahead of its ubershader.");
-        } else {
-          assert(drawPrograms.length === 1,
-            "Without parallel compile, the path must link only its exact program.");
-        }
-        report.passed.push("blocking ubershader submission order");
         blocking.destroy(); deferred.destroy();
-
-        const blockingMixed = makeTarget();
-        blockingMixed.block({ mix: true });
-        const blockingMixedUbers = blockingMixed.programs.filter((program) => program.draw && program.uber);
-        if (blockingMixed.parallel) {
-          for (const family of ["normal", "screen", "image"]) {
-            assert(blockingMixedUbers.some((program) => program.family === family),
-              "Blocking mixed fixture missed the " + family + " family.");
-          }
-          for (const uber of blockingMixedUbers) {
-            assert(uber.exactLinksAtLinkStatus === 0,
-              "A later family's blocking LINK_STATUS waited behind an exact link.");
-          }
-          assert(blockingMixed.programs.some((program) => program.draw && !program.uber),
-            "Blocking flush did not start its exact requests after drawing.");
-        }
-        blockingMixed.destroy(); report.passed.push("blocking frame-wide ubershader priority");
 
         const pendingBlock = makeTarget();
         const blocked = pendingBlock.attempt();
-        const queuedUbers = pendingBlock.programs.filter((program) => program.draw && program.uber).length;
+        const queuedPrograms = pendingBlock.programs.filter((program) => program.draw).length;
         if (pendingBlock.parallel) assert(blocked > 0, "Pending blocking-reuse fixture drew too soon.");
         pendingBlock.block();
-        assert(pendingBlock.programs.filter((program) => program.draw && program.uber).length === queuedUbers,
-          "Blocking flush created a duplicate pending ubershader.");
+        assert(pendingBlock.programs.filter((program) => program.draw).length === queuedPrograms,
+          "Blocking flush created a duplicate pending program.");
         assert(countDifferentPixels(drawn, pendingBlock.pixels()) === 0,
-          "Blocking flush did not finish the already-pending ubershader.");
+          "Blocking flush did not finish the already-pending program.");
         pendingBlock.destroy(); report.passed.push("blocking reuse of pending ubershader");
 
         document.body.dataset.deferredStep = "mixed";
@@ -599,8 +469,8 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         if (mixed.parallel) {
           assert(mixedPending >= 3, "Mixed frame did not report all three shader families pending.");
           for (const family of ["normal", "screen", "image"]) {
-            assert(mixed.programs.some((program) => program.draw && program.family === family && program.uber),
-              "Mixed frame did not link the " + family + " ubershader: " + JSON.stringify(mixed.programs.map(({family, uber, draw, atlas}) => ({family, uber, draw, atlas}))));
+            assert(mixed.programs.some((program) => program.draw && program.family === family),
+              "Mixed frame did not link the " + family + " ubershader: " + JSON.stringify(mixed.programs.map(({family, draw, atlas}) => ({family, draw, atlas}))));
             mixed.blockedFamilies.add(family);
           }
           mixed.setGate(true);
@@ -608,18 +478,11 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             await nextFrame();
             assert(mixed.attempt(mixedOptions) > 0, "Mixed frame drew with a family still pending.");
             assert(countDifferentPixels(mixedBefore, mixed.pixels()) === 0, "Pending mixed frame changed pixels.");
-            assert(!mixed.programs.some((program) => program.draw && !program.uber),
-              "Exact program was submitted while an ubershader was pending.");
             mixed.blockedFamilies.delete(family);
           }
           await mixed.untilDrawn(mixedOptions);
-          for (let frame = 0; frame < 180 && !mixed.programs.some((program) => program.draw && !program.uber && program.complete); frame++) {
-            await nextFrame(); mixed.attempt(mixedOptions);
-          }
-          assert(mixed.programs.some((program) => program.draw && !program.uber && program.complete),
-            "Exact programs did not appear and finish asynchronously: " + JSON.stringify(mixed.programs.map(({ family, uber, draw, complete }) => ({ family, uber, draw, complete }))));
         } else assert(mixedPending === 0, "Mixed fallback did not draw immediately.");
-        report.passed.push("mixed families and background exact programs");
+        report.passed.push("mixed families and pending gates");
         mixed.destroy();
 
         document.body.dataset.deferredStep = "overlay";
@@ -627,7 +490,6 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         overlay.seed(); const overlayBefore = overlay.pixels();
         const overlayOptions = { overlay: true };
         const overlayPending = overlay.attempt(overlayOptions);
-        const overlayLinkCount = overlay.programs.length;
         if (overlay.parallel) {
           assert(overlayPending >= 2, "Cold overlay did not count both path and blit programs.");
           assert(countDifferentPixels(overlayBefore, overlay.pixels()) === 0, "Pending overlay cleared the target.");
@@ -638,7 +500,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             const pending = overlay.attempt(overlayOptions);
             assert(pending > 0, "Overlay drew before its blit finished.");
             assert(countDifferentPixels(overlayBefore, overlay.pixels()) === 0, "Pending blit changed overlay pixels.");
-            if (overlay.programs.filter((program) => program.draw && program.uber).every((program) => program.complete)) {
+            if (overlay.programs.filter((program) => program.draw).every((program) => program.complete)) {
               assert(pending === 1, "Ready paths should wait on exactly the blit program.");
               onlyBlitPending = true; break;
             }
@@ -658,7 +520,6 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         }
         assert(overlay.programs.filter((program) => !program.draw && !program.atlas).length === 3,
           "Overlay linked an auxiliary blit program at draw time.");
-        assert(overlayLinkCount >= 3, "Blit was not started at context creation.");
         overlay.seed();
         overlay.block({ overlay: true, clear: false });
         assert(pixel(overlay.pixels(), 16, 40)[3] === 255, "clearRect leaked into the next frame.");
@@ -693,27 +554,14 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
 
         const noParallelBlocking = makeTarget({ hideParallel: true });
         noParallelBlocking.block();
-        // mc.3 creates the exact program asynchronously, but without KHR its
-        // constructor finishes it synchronously; the ready branch returns it.
-        // Count draw links only: the constructor blit is new in mc.4.
         const noParallelDraws = noParallelBlocking.programs.filter((program) => program.draw);
         assert(noParallelDraws.length === 1,
-          "Blocking path without KHR must match mc.3: one exact draw-program link.");
+          "Blocking flush without KHR must submit one draw-program link.");
         assert(countDifferentPixels(drawn, noParallelBlocking.pixels()) === 0,
           "Blocking path without KHR produced different pixels.");
-        noParallelBlocking.destroy(); report.passed.push("mc.3 blocking link count without KHR");
+        noParallelBlocking.destroy(); report.passed.push("blocking link count without KHR");
 
-        document.body.dataset.deferredStep = "uberOnly";
-        const uberOnly = makeTarget({ exact: false });
-        const uberFirst = uberOnly.attempt({ mix: true });
-        if (uberOnly.parallel) { uberOnly.setGate(true); await uberOnly.untilDrawn({ mix: true }); }
-        else assert(uberFirst === 0, "Uber-only fallback did not draw.");
-        for (let frame = 0; frame < 4; frame++) { await nextFrame(); uberOnly.attempt({ mix: true }); }
-        assert(uberOnly.programs.filter((program) => program.draw).every((program) => program.uber),
-          "Exact programs were created with exact programs disabled.");
-        uberOnly.destroy(); report.passed.push("ubershader-only switch");
-
-        document.body.dataset.deferredStep = "feathered";
+        document.body.dataset.deferredStep = "feather";
         const feathered = makeTarget();
         feathered.seed(); const featherBefore = feathered.pixels();
         const featherOptions = { feathered: true };
@@ -733,21 +581,31 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           "Feather tryFlush() differs from blocking flush().");
         feathered.destroy(); report.passed.push("lazy feather completion gates");
 
-        const imageProbe = makeTarget({ exact: false });
+        const imageProbe = makeTarget();
         imageProbe.block({ quad: true });
         const quadPixels = imageProbe.pixels();
         assert(countOpaquePixels(quadPixels) > 0, "The non-mesh Image fixture drew nothing.");
         assert(imageProbe.programs.some((program) => program.draw && program.family === "image"),
           "Depth-stencil drawImage did not use an image-mesh program.");
         assert(!imageProbe.programs.some((program) => hasDefine(program.source, "ENABLE_MODULATED_IMAGE")),
-          "A plain image draw linked M with exact programs disabled.");
+          "A plain image draw linked M.");
         imageProbe.block({ paintQuad: true });
         assert(countDifferentPixels(quadPixels, imageProbe.pixels()) === 0,
           "The image-mesh route differs from the equivalent path reference.");
         assert(imageProbe.imageMaterialWrites === 0,
           "Plain images uploaded material uniforms.");
+        const meshHasH = imageProbe.programs.some((program) => program.family === "image" && hasDefine(program.source, "ENABLE_HSL_BLEND_MODES"));
         const imageProgramsBeforeMaterial = imageProbe.programs.filter((program) => program.family === "image").length;
         report.passed.push("DS image quad uses mesh and matches path reference");
+        imageProbe.block({ quad: true, modulatedOpacity: 0.5 });
+        const halfOpacityPixels = imageProbe.pixels();
+        imageProbe.block({ paintQuad: true, modulatedOpacity: 0.5 });
+        assert(countOpaquePixels(halfOpacityPixels) > 0 &&
+          countDifferentPixels(halfOpacityPixels, imageProbe.pixels()) === 0 &&
+          countDifferentPixels(quadPixels, halfOpacityPixels) > 0,
+          "Image opacity differs from the path reference under modulateOpacity.");
+        report.passed.push("image modulated opacity applied once");
+
 
         for (const material of [1, 2]) {
           imageProbe.block({ meshQuad: true, material });
@@ -762,7 +620,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             "Material image mesh differs from its path reference.");
         }
         assert(imageProbe.imageMaterialWrites > 0 &&
-          imageProbe.programs.filter((program) => program.family === "image").length === imageProgramsBeforeMaterial &&
+          imageProbe.programs.filter((program) => program.family === "image").length === imageProgramsBeforeMaterial + (meshHasH ? 0 : 1) &&
           !imageProbe.programs.some((program) => hasDefine(program.source, "ENABLE_MODULATED_IMAGE")),
           "Material image meshes failed to reuse their lean program.");
         imageProbe.block({ quad: true });
@@ -1161,7 +1019,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
 
 /** Installs the packed artifact so omitted package files fail the check. */
 async function main(wasmFilename) {
-  const browser = findBrowser();
+  const browser = await findChrome();
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "rive-webgl2-package-"));
   try {
     const packResult = await run(
@@ -1199,6 +1057,7 @@ async function main(wasmFilename) {
       imageBindingFixturePath,
       join(temporaryDirectory, "image-binding-fixture.riv"),
     );
+    await copyFile(join(scriptDirectory, "webgl2_test_support.mjs"), join(temporaryDirectory, "webgl2_test_support.mjs"));
     await writeFile(join(temporaryDirectory, "index.html"), testPage(wasmFilename));
 
     const server = await startServer(temporaryDirectory);

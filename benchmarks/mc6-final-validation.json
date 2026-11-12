@@ -1,0 +1,905 @@
+{
+  "build": "A",
+  "baselineDirectory": "mc6-candidate",
+  "packages": [
+    {
+      "version": "2.42.2-mc.6",
+      "wasmSha256": "a5b3f4e511af2488c568d944d39f18e8a16b730b7267b1db97dd4de1f722c549"
+    },
+    {
+      "version": "2.42.2-mc.6",
+      "wasmSha256": "901dfbdc220bfb1ceb1eaa090bb7e42813d8222952ccbb5db3a01682a7f3f01a"
+    }
+  ],
+  "method": {
+    "target": "512x512 external bottom-up MSAA texture",
+    "frames": [
+      0,
+      30,
+      60,
+      90
+    ],
+    "stepSeconds": 0.016666666666666666,
+    "materialTimeSeconds": "frame / 60",
+    "channelTolerance": 2,
+    "wasm": "SIMD; package checks also run scalar"
+  },
+  "programListsIdentical": true,
+  "programs": [
+    {
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 2060 SUPER/PCIe/SSE2, OpenGL ES 3.2)",
+      "programs": [
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ],
+          "firstCase": "Bat:hatImage:Plain",
+          "usedMaterialModes": [
+            0,
+            1,
+            2
+          ],
+          "usedCaseCount": 209
+        },
+        {
+          "type": "imageMesh",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_IMAGE",
+            "DRAW_IMAGE_MESH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ],
+          "firstCase": "Bat:hatImage:Plain",
+          "usedMaterialModes": [
+            0,
+            1,
+            2
+          ],
+          "usedCaseCount": 200
+        },
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ],
+          "firstCase": "Bat:hatImage:Gold",
+          "usedMaterialModes": [
+            1,
+            2
+          ],
+          "usedCaseCount": 132
+        },
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_ADVANCED_BLEND",
+            "ENABLE_DITHER",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ],
+          "firstCase": "splash-fall.riv",
+          "usedMaterialModes": [
+            0
+          ],
+          "usedCaseCount": 5
+        }
+      ]
+    },
+    {
+      "gpu": "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 2060 SUPER/PCIe/SSE2, OpenGL ES 3.2)",
+      "programs": [
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ],
+          "firstCase": "Bat:hatImage:Plain",
+          "usedMaterialModes": [
+            0,
+            1,
+            2
+          ],
+          "usedCaseCount": 209
+        },
+        {
+          "type": "imageMesh",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_IMAGE",
+            "DRAW_IMAGE_MESH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ],
+          "firstCase": "Bat:hatImage:Plain",
+          "usedMaterialModes": [
+            0,
+            1,
+            2
+          ],
+          "usedCaseCount": 200
+        },
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ],
+          "firstCase": "Bat:hatImage:Gold",
+          "usedMaterialModes": [
+            1,
+            2
+          ],
+          "usedCaseCount": 132
+        },
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_ADVANCED_BLEND",
+            "ENABLE_DITHER",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ],
+          "firstCase": "splash-fall.riv",
+          "usedMaterialModes": [
+            0
+          ],
+          "usedCaseCount": 5
+        }
+      ]
+    }
+  ],
+  "coldPetPrograms": [
+    {
+      "plain": [
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        },
+        {
+          "type": "imageMesh",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_IMAGE",
+            "DRAW_IMAGE_MESH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        }
+      ],
+      "plainAndGold": [
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        },
+        {
+          "type": "imageMesh",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_IMAGE",
+            "DRAW_IMAGE_MESH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        },
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        }
+      ],
+      "plainAndRainbow": [
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        },
+        {
+          "type": "imageMesh",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_IMAGE",
+            "DRAW_IMAGE_MESH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        },
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        }
+      ]
+    },
+    {
+      "plain": [
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        },
+        {
+          "type": "imageMesh",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_IMAGE",
+            "DRAW_IMAGE_MESH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        }
+      ],
+      "plainAndGold": [
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        },
+        {
+          "type": "imageMesh",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_IMAGE",
+            "DRAW_IMAGE_MESH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        },
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        }
+      ],
+      "plainAndRainbow": [
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        },
+        {
+          "type": "imageMesh",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_IMAGE",
+            "DRAW_IMAGE_MESH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        },
+        {
+          "type": "path",
+          "defines": [
+            "BASE_INSTANCE_UNIFORM_NAME",
+            "DISABLE_SHADER_STORAGE_BUFFERS",
+            "DRAW_PATH",
+            "ENABLE_DITHER",
+            "ENABLE_HSL_BLEND_MODES",
+            "ENABLE_INSTANCE_INDEX",
+            "ENABLE_RENDER_TARGET_BOTTOM_UP",
+            "FIXED_FUNCTION_COLOR_OUTPUT",
+            "FRAGMENT",
+            "GLSL",
+            "GLSL_VERSION",
+            "RENDER_MODE_DEPTH_STENCIL",
+            "RIVE_SURFACE_MATERIAL",
+            "VERTEX"
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "hatImage:Plain": {
+      "cases": 32,
+      "samples": 128,
+      "changedPixels": 0,
+      "maxDelta": 0,
+      "overTolerance": 0,
+      "nonAAPixels": 0
+    },
+    "hatImage:Gold": {
+      "cases": 32,
+      "samples": 128,
+      "changedPixels": 1,
+      "maxDelta": 1,
+      "overTolerance": 0,
+      "nonAAPixels": 0
+    },
+    "hatImage:Rainbow": {
+      "cases": 32,
+      "samples": 128,
+      "changedPixels": 0,
+      "maxDelta": 0,
+      "overTolerance": 0,
+      "nonAAPixels": 0
+    },
+    "tieImage:Plain": {
+      "cases": 32,
+      "samples": 128,
+      "changedPixels": 0,
+      "maxDelta": 0,
+      "overTolerance": 0,
+      "nonAAPixels": 0
+    },
+    "tieImage:Gold": {
+      "cases": 32,
+      "samples": 128,
+      "changedPixels": 4,
+      "maxDelta": 1,
+      "overTolerance": 0,
+      "nonAAPixels": 0
+    },
+    "tieImage:Rainbow": {
+      "cases": 32,
+      "samples": 128,
+      "changedPixels": 0,
+      "maxDelta": 0,
+      "overTolerance": 0,
+      "nonAAPixels": 0
+    },
+    "meshReference": {
+      "cases": 3,
+      "samples": 12,
+      "changedPixels": 0,
+      "maxDelta": 0,
+      "overTolerance": 0,
+      "nonAAPixels": 0
+    },
+    "splash": {
+      "cases": 5,
+      "samples": 20,
+      "changedPixels": 0,
+      "maxDelta": 0,
+      "overTolerance": 0,
+      "nonAAPixels": 0
+    },
+    "avatar": {
+      "cases": 5,
+      "samples": 20,
+      "changedPixels": 0,
+      "maxDelta": 0,
+      "overTolerance": 0,
+      "nonAAPixels": 0
+    },
+    "material": {
+      "cases": 4,
+      "samples": 16,
+      "changedPixels": 0,
+      "maxDelta": 0,
+      "overTolerance": 0,
+      "nonAAPixels": 0
+    }
+  },
+  "noModulatedImagePrograms": true,
+  "tests": {
+    "rive.wasm": "PASS, 13 groups plus existing package checks",
+    "rive_fallback.wasm": "PASS, 13 groups plus existing package checks",
+    "halfOpacityImage": "matches solid-color path reference; alpha is applied once",
+    "queries": "no program queries/links in issue; pending program polled once per tryFlush"
+  },
+  "opacityReach": "Static scan: zero ScriptedDrawable/ScriptedLayout objects in 46 .riv files; no client modulateOpacity calls found. Ordinary nested/image renderOpacity is a draw argument, not renderer modulated opacity.",
+  "clipPolicy": "Host ANGLE disables clip planes. Mask behavior with supportsClipPlanes=true is checked by a standalone compile-time check. C is ORed into a merged path batch; no C feature split. Existing geometry/scissor/misc breaks still apply; meshes never merge.",
+  "artifact": {
+    "path": "/tmp/claude-1000/-home-aroman-Projects-magiccircle-worktrees-ar-frame-clumping/41a48e0a-d803-4ab3-a17b-65638fa1b6d4/scratchpad/out/mc6-final/magiccircle-rive-webgl2-advanced-2.42.2-mc.6.tgz",
+    "integrity": "sha512-MCY04sV/12S3Kty3UpW9h1ycIzrb7YQbUbzsoRTk1EREPknNK6sEkLXjBVHG3xa5yT4JYA5/Ffv++3JmdMD/SQ=="
+  },
+  "cases": [
+    {"case":"Bat:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bat:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bat:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bat:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bat:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bat:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bee:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bee:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bee:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bee:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bee:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bee:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bunny:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bunny:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bunny:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bunny:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bunny:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Bunny:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Butterfly:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Butterfly:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Butterfly:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Butterfly:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Butterfly:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Butterfly:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Capybara:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Capybara:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Capybara:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Capybara:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Capybara:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Capybara:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Chicken:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Chicken:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Chicken:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Chicken:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Chicken:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Chicken:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Cow:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Cow:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Cow:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Cow:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Cow:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Cow:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Dragonfly:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Dragonfly:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Dragonfly:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Dragonfly:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Dragonfly:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Dragonfly:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"FireHorse:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"FireHorse:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"FireHorse:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"FireHorse:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"FireHorse:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"FireHorse:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Goat:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Goat:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Goat:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Goat:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Goat:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Goat:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Horse:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Horse:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Horse:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Horse:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Horse:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Horse:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Moth:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Moth:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Moth:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Moth:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Moth:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Moth:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Ostrich:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Ostrich:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Ostrich:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Ostrich:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Ostrich:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Ostrich:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Peacock:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Peacock:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Peacock:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Peacock:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Peacock:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Peacock:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Phoenix:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Phoenix:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Phoenix:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Phoenix:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Phoenix:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Phoenix:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pig:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pig:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pig:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pig:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pig:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pig:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Platypus:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Platypus:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Platypus:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Platypus:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Platypus:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Platypus:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pony:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pony:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pony:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pony:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pony:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Pony:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"RedFox:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"RedFox:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"RedFox:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"RedFox:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"RedFox:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"RedFox:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Rooster:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Rooster:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Rooster:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Rooster:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Rooster:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Rooster:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Sheep:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Sheep:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Sheep:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Sheep:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Sheep:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Sheep:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snail:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snail:hatImage:Gold","group":"hatImage:Gold","changedPixels":1,"maxDelta":1,"changedPixelsByFrame":[0,0,1,0]},
+    {"case":"Snail:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snail:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snail:tieImage:Gold","group":"tieImage:Gold","changedPixels":1,"maxDelta":1,"changedPixelsByFrame":[0,0,1,0]},
+    {"case":"Snail:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snake:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snake:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snake:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snake:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snake:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snake:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"SnowFox:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"SnowFox:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"SnowFox:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"SnowFox:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"SnowFox:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"SnowFox:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Squirrel:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Squirrel:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Squirrel:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Squirrel:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Squirrel:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Squirrel:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Stoat:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Stoat:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Stoat:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Stoat:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Stoat:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Stoat:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"ThunderWolf:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"ThunderWolf:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"ThunderWolf:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"ThunderWolf:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"ThunderWolf:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"ThunderWolf:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Toad:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Toad:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Toad:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Toad:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Toad:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Toad:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turkey:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turkey:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turkey:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turkey:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turkey:tieImage:Gold","group":"tieImage:Gold","changedPixels":3,"maxDelta":1,"changedPixelsByFrame":[0,0,3,0]},
+    {"case":"Turkey:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turtle:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turtle:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turtle:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turtle:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turtle:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Turtle:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"WhiteCaribou:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"WhiteCaribou:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"WhiteCaribou:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"WhiteCaribou:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"WhiteCaribou:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"WhiteCaribou:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Worm:hatImage:Plain","group":"hatImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Worm:hatImage:Gold","group":"hatImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Worm:hatImage:Rainbow","group":"hatImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Worm:tieImage:Plain","group":"tieImage:Plain","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Worm:tieImage:Gold","group":"tieImage:Gold","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Worm:tieImage:Rainbow","group":"tieImage:Rainbow","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"mesh-reference:Plain","group":"meshReference","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"mesh-reference:Gold","group":"meshReference","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"mesh-reference:Rainbow","group":"meshReference","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"splash-fall.riv","group":"splash","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"splash-halloween.riv","group":"splash","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"splash-spring.riv","group":"splash","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"splash-winter.riv","group":"splash","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"splash.riv","group":"splash","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"avatar:bottom","group":"avatar","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"avatar:mid","group":"avatar","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"avatar:top","group":"avatar","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"avatar:portrait","group":"avatar","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"avatar:all","group":"avatar","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snail:Gold","group":"material","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"Snail:Rainbow","group":"material","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"FireHorse:Gold","group":"material","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]},
+    {"case":"FireHorse:Rainbow","group":"material","changedPixels":0,"maxDelta":0,"changedPixelsByFrame":[0,0,0,0]}
+  ],
+  "manifest": [
+    {"path":"client/raw-assets/rive/pets{m}/Bat.riv","sha256":"5f9a3582f478d1f4040ea8e559025c6db22be0c2c9644a404f7cb2684dfdfbb1"},
+    {"path":"client/raw-assets/rive/pets{m}/Bee.riv","sha256":"51e6941abdbf7faac7d069ea412071c0f078be87f39e8a3001a24d25690f73bd"},
+    {"path":"client/raw-assets/rive/pets{m}/Bunny.riv","sha256":"541b84299238218489c3892c9d783c76ebdd84686529cd4b52e47b25eab609b9"},
+    {"path":"client/raw-assets/rive/pets{m}/Butterfly.riv","sha256":"194c09627e3c712becc605536f6586655a009bb8a6ebf67689c601153f8ab062"},
+    {"path":"client/raw-assets/rive/pets{m}/Capybara.riv","sha256":"e7398ae163e80cbf6769d38877d4a6e56568e871f3c1a78fa01e4b7771bf9447"},
+    {"path":"client/raw-assets/rive/pets{m}/Chicken.riv","sha256":"883d24aa648329d6e95b048b2b1d3912c87d15d868809e931ea54254928f2fb1"},
+    {"path":"client/raw-assets/rive/pets{m}/Cow.riv","sha256":"4096291b6410edc611e6607e9b85434deb6f260a159fb7eb606b782861597635"},
+    {"path":"client/raw-assets/rive/pets{m}/Dragonfly.riv","sha256":"50604fc435e27639abad715548798599e8b2a51f9a7c0a11582cd898e3d154ff"},
+    {"path":"client/raw-assets/rive/pets{m}/FireHorse.riv","sha256":"38ebe90b27ddd6becfe28f1c8e3990ee857df9a2f9941b0717626ccc06d0cb4b"},
+    {"path":"client/raw-assets/rive/pets{m}/Goat.riv","sha256":"e0392b3f5f73426ee7dfc0278716209495e1d491add01b3bec57e5927fc230ed"},
+    {"path":"client/raw-assets/rive/pets{m}/Horse.riv","sha256":"aab104a187f379470d0defb285895d434a4e217809a6d1534e17449ba78bd0ae"},
+    {"path":"client/raw-assets/rive/pets{m}/Moth.riv","sha256":"98f55c45812be37f6f4695c2cc69d1c197edb22711e957658dc84d78df48f574"},
+    {"path":"client/raw-assets/rive/pets{m}/Ostrich.riv","sha256":"911b107787c3f14c6edb5669e9d6e0d9eed0d0980ad8844b612de7954817465c"},
+    {"path":"client/raw-assets/rive/pets{m}/Peacock.riv","sha256":"829d9d3701bb9a044092c7c729994e610c38216572e0e66df8a1323327a0177e"},
+    {"path":"client/raw-assets/rive/pets{m}/Phoenix.riv","sha256":"dcbedf4add67661503e6dc6ba76e1341ca93bb51cb042dedb0e954e7c1fca17d"},
+    {"path":"client/raw-assets/rive/pets{m}/Pig.riv","sha256":"271281a73772142dc7b094528a2ec1d24055c98b3c245c599613a28c39b0afa7"},
+    {"path":"client/raw-assets/rive/pets{m}/Platypus.riv","sha256":"d4853af8b39cbec9595c2ed3367cf16a8f0577df2e352fd189989803d2d49686"},
+    {"path":"client/raw-assets/rive/pets{m}/Pony.riv","sha256":"103d8434e9a35bc750045d68cc20fa0d72523673c5bed7ac0591a67f27b222e3"},
+    {"path":"client/raw-assets/rive/pets{m}/RedFox.riv","sha256":"ee57819022f6c638c3de549742a7707ef4a0dd00fbb436690e7440588493b6d6"},
+    {"path":"client/raw-assets/rive/pets{m}/Rooster.riv","sha256":"29425c2f8a3ce2fe91e024a501fd2d0ace7ae62705abb767b9a8db027a215f84"},
+    {"path":"client/raw-assets/rive/pets{m}/Sheep.riv","sha256":"154b42d8ed9b2626e5cb034530ce3caa93ae79ccd42ba6bff5bf7115a80205a3"},
+    {"path":"client/raw-assets/rive/pets{m}/Snail.riv","sha256":"ccc72671a474697738ee92f50b2e8f4d4a7d76954f0f2ad6de85657f80b349a5"},
+    {"path":"client/raw-assets/rive/pets{m}/Snake.riv","sha256":"95f94916185ee4c52a3d6b27377dc3d9d7c02cb6ec9a04575ce1b436274965cf"},
+    {"path":"client/raw-assets/rive/pets{m}/SnowFox.riv","sha256":"aa9f1941a7c6f0fde6b9c5e9d825dd0f26f675b780e72fc2931620201520ee54"},
+    {"path":"client/raw-assets/rive/pets{m}/Squirrel.riv","sha256":"13cc9269bc130255202c7b74bc5dc05c0ddc05312e85a5ed13d7413168df6940"},
+    {"path":"client/raw-assets/rive/pets{m}/Stoat.riv","sha256":"76a98e0c09400898ea9455194e2b0ccbd4be242bc3b74824bafc0ef03df75552"},
+    {"path":"client/raw-assets/rive/pets{m}/ThunderWolf.riv","sha256":"66f7c0d8a1c6482e5326ade48b8a6b2bd15a64fa5224dfb2cbfc273903240e42"},
+    {"path":"client/raw-assets/rive/pets{m}/Toad.riv","sha256":"0b917a6c20e46ae6ffe62c69d157bbd4f0602bc2457eb3fd40cddcdb18337b9d"},
+    {"path":"client/raw-assets/rive/pets{m}/Turkey.riv","sha256":"c1d9f369e0afe556fa182e10f04d15e85d2d264014191180bfea49f98ce12b9b"},
+    {"path":"client/raw-assets/rive/pets{m}/Turtle.riv","sha256":"a0739c1aa646678ef2cdba596a0f4e3248f7ed11413239f9ac3921ac6b19bc0e"},
+    {"path":"client/raw-assets/rive/pets{m}/WhiteCaribou.riv","sha256":"5ca6b07358fdd54d334bb5c598e878040255c2ec1451a97d6cd459c278820416"},
+    {"path":"client/raw-assets/rive/pets{m}/Worm.riv","sha256":"2f81049f33f2eb45a5fac5bbad575d5fbe991f721c5e5c07f3340b2f04328d29"},
+    {"path":"client/src/boot/splashscreen/splash-fall.riv","sha256":"9a34ef281a1c0d75c17a3dd79dcb1ef77056878d09a90637131a2f4e59ab33dd"},
+    {"path":"client/src/boot/splashscreen/splash-halloween.riv","sha256":"248d3d6235294f54bb02a2921158ef3cac499f8034960864672fc02d51909756"},
+    {"path":"client/src/boot/splashscreen/splash-spring.riv","sha256":"a7814184dbd3b5b941777d57bb3a555dcb525b8d09f06e1aa437181d1c7f327d"},
+    {"path":"client/src/boot/splashscreen/splash-winter.riv","sha256":"636db1f1a7fba8b72c135ac9949c3d47378e62c488c3d11e83078054ce51d601"},
+    {"path":"client/src/boot/splashscreen/splash.riv","sha256":"f5f2c88863d292c792347035b3c4ca940078426b4e91c62c3819d67d1cf449dc"},
+    {"path":"client/raw-assets/rive/avatar.riv","sha256":"b81fa86a57c9b624e5675acfc321f00e2baec5bcaac29ea5addfd7fbca821d8e"},
+    {"path":"client/raw-assets/atlases/sprite/pet-cosmetic/Fez.png","sha256":"571e9085f373d739f64857684afdc25db55af7a451f7b00465a55d0585139ed9"},
+    {"path":"client/raw-assets/atlases/sprite/pet-cosmetic/BowTie.png","sha256":"349fc721bf454b76d3ea90fbfa1eea4da6b495c1dfe4d65f55d3625b4d775800"},
+    {"path":"client/raw-assets/cosmetic{m}{nc}/Bottom_DefaultGray.png","sha256":"33eb8839370ddceb6d73ed27fe7ea2261abfbae7b8fe199c57b082df267c3a0b"},
+    {"path":"client/raw-assets/cosmetic{m}{nc}/Mid_Dino.png","sha256":"c15c79920fb8d7126aea78f06caedf7168f13242b2b71531c712261886443a40"},
+    {"path":"client/raw-assets/cosmetic{m}{nc}/Top_DiscordPopsicle.png","sha256":"00392f8aee1daf82c860920995b9a6422fb9944c8d698a006a1479757071a3b4"}
+  ]
+}

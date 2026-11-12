@@ -17,23 +17,21 @@ The fork adds:
 - asynchronous ImageBitmap decoding before the first image upload, with
   premultiplied alpha, bitmap cleanup, and an HTMLImageElement fallback for
   later contexts or browsers that cannot decode a bitmap;
-- `tryFlush()` for consuming a recorded frame without drawing until its
-  shaders finish linking in the background, and overlay `clearRect()` for
-  clearing atlas regions only when the frame draws. `flush()` remains
-  blocking and also applies the recorded rectangles. `setExactProgramsEnabled(false)`
-  draws with each family's ubershader only, so no exact variant is linked
-  or first drawn later; and
-- cached image quads in depth-stencil mode, and path ubershaders without
-  modulated images or material/HSL support unless a draw requests them.
-  Plain and material paths use separate batches. Image meshes retain material
-  support in their default program and share the path material
-  mapping and shading, with material coordinates computed from fragment position
-  and per-draw uniforms. Plain meshes add no vertex data or material uploads;
-  a draw following a materialized mesh only resets the program's material mode.
+- `tryFlush()` consumes a recorded frame and draws only when every required
+  shader is linked; a pending frame leaves its target untouched. Overlay
+  `clearRect()` clears recorded atlas regions only when the frame draws.
+  `flush()` remains blocking and honors the same rectangles; and
+- an ubershader-only WebGL2 renderer, cached image quads in depth-stencil mode,
+  and per-draw opt-in path material/HSL and image-paint features. Plain and
+  material paths use separate batches. Image meshes switch materials through
+  fragment uniforms without adding vertex data; plain meshes upload no material
+  uniforms except a mode reset after a materialized mesh.
 
 `2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
 decoding before invoking `decodeImage`'s callback, reports invalid images as
 `null`, and releases Blob URLs and native decode references on failure.
+`2.42.2-mc.4–mc.6` add deferred shader-ready flushes, atomic overlay clears,
+image-mesh materials and lean ubershaders.
 The image-element fallback preserves the upstream runtime's multi-context
 contract; Magic Circle's current renderer sessions do not share images
 across contexts.
@@ -81,25 +79,27 @@ project, starts a local server, and drives real WebGL2 in headless Chrome. It
 checks both WASM variants with the same JS loader: public fork APIs,
 normal/Gold/Rainbow rendering, external render targets, overlay preservation,
 texture-backed images, decode readiness and failures, Blob URL and bitmap
-cleanup, matching image uploads across two GL contexts, and teardown.
+cleanup, matching image uploads across two GL contexts, and teardown. It also
+checks pending-frame preservation, completion-only polling, mixed shader
+families, lazy feather programs, overlay clear orientation, extension fallback,
+material program selection, mesh uniform resets, and modulated image opacity.
 Set `CHROME_BIN` if Chrome is not on PATH.
 Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 `RIVE_TEST_WASM` optionally restricts the binary under test.
 
 `wasm/scripts/compare_webgl2_pixels.mjs` compares two staged packages with
-exact programs disabled, using host-GPU ANGLE GL. It samples all 32 pets
+ubershader rendering, using host-GPU ANGLE GL. It samples all 32 pets
 with hats and ties in plain, Gold, and Rainbow, splash files, avatar cosmetics,
 and Gold/Rainbow pets at frames 0, 30, 60, and 90. The output includes per-case
 pixel differences, asset/package hashes, and every linked draw program's defines.
 Save the baseline's generated `glsl.glsl.exports.h` beside its package before
-rebuilding
-(from `wasm/build/webgl2_advanced/bin/release/include/generated/shaders/`).
+rebuilding (from `wasm/build/webgl2_advanced/bin/release/include/generated/shaders/`).
 Set `PLAYWRIGHT_MODULE` to an installed Playwright module and `CHROME_BIN`
 to a host Chrome if needed, then run:
 
 ```sh
 node wasm/scripts/compare_webgl2_pixels.mjs \
-  /path/to/mc5-final-package js/npm/webgl2_advanced /path/to/magiccircle.gg /path/to/results
+  /path/to/baseline-package js/npm/webgl2_advanced /path/to/magiccircle.gg /path/to/results
 ```
 
 Synthetic authored meshes use the same mesh in both builds; an mc.4 baseline

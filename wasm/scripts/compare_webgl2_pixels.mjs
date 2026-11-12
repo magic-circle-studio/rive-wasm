@@ -1,10 +1,11 @@
-// Compare staged packages with exact programs disabled on a host GPU.
+// Compare ubershader rendering from staged packages on a host GPU.
 // PLAYWRIGHT_MODULE may point to an existing Playwright installation.
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { resolve, join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { findChrome, parseShaderMacros } from "./webgl2_test_support.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const [baselineArg, candidateArg, assetsArg, outputArg] = process.argv.slice(2);
@@ -20,8 +21,7 @@ for (const directory of [baseline, candidate]) {
     "wasm/build/webgl2_advanced/bin/release/include/generated/shaders"), "glsl.glsl.exports.h"), "utf8");
   packages.push({ version: JSON.parse(await readFile(join(directory, "package.json"))).version,
     wasmSha256: hash(await readFile(join(directory, "rive.wasm"))),
-    macros: Object.fromEntries(Array.from(header.matchAll(/^#define GLSL_(\w+) "([^"]+)"$/gm),
-      ([, name, value]) => [value, name])) });
+    macros: Object.fromEntries(Object.entries(parseShaderMacros(header)).map(([name, alias]) => [alias, name])) });
 }
 const petsPath = "client/raw-assets/rive/pets{m}";
 const pets = (await readdir(join(assets, petsPath))).filter((name) => name.endsWith(".riv")).sort();
@@ -67,6 +67,7 @@ const mime = { ".mjs": "text/javascript", ".wasm": "application/wasm", ".png": "
 const server = createServer(async (request, response) => {
   try {
     const path = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
+    if (path === "/webgl2_test_support.mjs") { response.setHeader("Content-Type", "text/javascript"); response.end(await readFile(join(root, "wasm/scripts/webgl2_test_support.mjs"))); return; }
     if (path === "/favicon.ico") { response.writeHead(204).end(); return; }
     if (path === "/") { response.setHeader("Content-Type", "text/html"); response.end("<!doctype html><body></body>"); return; }
     const directory = path.startsWith("/baseline/") ? baseline : path.startsWith("/candidate/") ? candidate : assets;
@@ -78,7 +79,7 @@ const server = createServer(async (request, response) => {
   } catch { response.writeHead(404).end(); }
 });
 await new Promise((done) => server.listen(0, "127.0.0.1", done));
-const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN ?? "/etc/profiles/per-user/aroman/bin/google-chrome",
+const browser = await chromium.launch({ executablePath: await findChrome(),
   headless: true, downloadsPath: output,
   env: { ...process.env, WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY ?? "wayland-1" },
   args: ["--use-gl=angle", "--use-angle=gl", "--ozone-platform=wayland", "--disable-features=Vulkan",
@@ -89,6 +90,7 @@ try {
   page.on("console", (message) => { if (message.type() === "error") console.error(message.text()); });
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   const result = await page.evaluate(async ({ packages, cases, images }) => {
+    const { pathFixture } = await import("/webgl2_test_support.mjs");
     const sides = [];
     const assert = (condition, message) => { if (!condition) throw new Error(message); };
     const imageCanvas = new OffscreenCanvas(32, 32);
@@ -96,42 +98,6 @@ try {
     imageContext.fillStyle = "#e0308080";
     imageContext.fillRect(0, 0, 32, 32);
     const png = new Uint8Array(await (await imageCanvas.convertToBlob()).arrayBuffer());
-    // mc.4 needs an image-path reference; newer baselines use authored meshes.
-    function imageFixture(mesh) {
-      const bytes = [...new TextEncoder().encode("RIVE"), 7, 0, 0, 0];
-      const uint = (value) => {
-        do {
-          const byte = value & 127; value >>>= 7;
-          bytes.push(byte | (value ? 128 : 0));
-        } while (value);
-      };
-      const prop = (key, value, type = "uint") => {
-        uint(key);
-        if (type === "uint") uint(value);
-        else if (type === "bytes") { uint(value.length); bytes.push(...value); }
-        else {
-          const buffer = new ArrayBuffer(4);
-          new DataView(buffer).setFloat32(0, value, true);
-          bytes.push(...new Uint8Array(buffer));
-        }
-      };
-      uint(23); uint(0);
-      uint(105); prop(204, 0); prop(208, 32, "float"); prop(207, 32, "float"); uint(0);
-      uint(106); prop(212, png, "bytes"); uint(0);
-      uint(1); prop(7, 256, "float"); prop(8, 256, "float"); uint(0);
-      uint(100); prop(5, 0); prop(206, 0);
-      prop(13, 176, "float"); prop(14, 176, "float");
-      prop(380, 0, "float"); prop(381, 0, "float"); uint(0);
-      if (mesh) {
-        uint(109); prop(5, 1); prop(223, [0, 1, 2, 0, 2, 3], "bytes"); uint(0);
-        for (const [x, y, u, v] of [[0, 0, 0, 0], [32, 0, 1, 0], [32, 32, 1, 1], [0, 32, 0, 1]]) {
-          uint(108); prop(5, 2); prop(24, x, "float"); prop(25, y, "float");
-          prop(215, u, "float"); prop(216, v, "float"); uint(0);
-        }
-      }
-      return new Uint8Array(bytes);
-    }
-    const features = /^ENABLE_(CLIPPING|CLIP_RECT|ADVANCED_BLEND|FEATHER|EVEN_ODD|NESTED_CLIPPING|HSL_BLEND_MODES|DITHER|MODULATED_IMAGE)$/;
     for (const [index, prefix] of ["baseline", "candidate"].entries()) {
       const { default: init } = await import("/" + prefix + "/webgl2_advanced.mjs");
       const rive = await init({ locateFile: () => "/" + prefix + "/rive.wasm" });
@@ -158,7 +124,7 @@ try {
         }))].sort();
         const type = defines.includes("DRAW_IMAGE_MESH") ? "imageMesh" : defines.includes("DRAW_PATH") ? "path"
           : defines.includes("DRAW_INTERIOR_TRIANGLES") ? "interiorTriangles" : defines.includes("FEATHER_ATLAS_BLIT") ? "featherAtlasBlit" : "aux";
-        const record = { type, defines, features: defines.filter((name) => features.test(name)), firstCase: current, usedCases: {} };
+        const record = { type, defines,  firstCase: current, usedCases: {} };
         programs.push(record); records.set(program, record);
         originalLink(program);
       };
@@ -172,7 +138,7 @@ try {
           return original(...args);
         };
       }
-      const renderer = rive.makeRenderer(canvas); renderer.setExactProgramsEnabled(false);
+      const renderer = rive.makeRenderer(canvas); renderer.setExactProgramsEnabled?.(false);
       renderer.bindContext();
       const target = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, target);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, 512, 512);
@@ -207,8 +173,8 @@ try {
       const states = [];
       for (const side of sides) {
         side.renderer.bindContext(); side.setCurrent(spec.name);
-        const file = await side.rive.load(bytes ?? imageFixture(
-          side === sides[1] || packages[0].version !== "2.42.2-mc.4"));
+        const file = await side.rive.load(bytes ?? (side === sides[1] || packages[0].version !== "2.42.2-mc.4"
+          ? pathFixture({ meshPNG: png, unitMesh: true }) : pathFixture({ imagePNG: png })));
         await Promise.all(Array.from(side.rive.images?.values() ?? [], (image) => image.decodePromise));
         const art = spec.synthetic ? file.defaultArtboard()
           : file.artboardByName(spec.artboard);
@@ -230,7 +196,6 @@ try {
         states.push({ file, art, vm, sm, anim });
       }
       for (let frame = 0; frame <= 90; frame++) {
-        const pixels = [];
         for (let index = 0; index < 2; index++) {
           const side = sides[index], state = states[index], dt = frame ? 1 / 60 : 0;
           if (frame === 60 && state.sm) {
@@ -240,7 +205,11 @@ try {
             }
           }
           state.sm?.advance(dt); state.anim?.advance(dt); state.anim?.apply(1); state.art.advance(dt);
-          if (![0, 30, 60, 90].includes(frame)) continue;
+        }
+        if (![0, 30, 60, 90].includes(frame)) continue;
+        const pixels = [];
+        for (let index = 0; index < 2; index++) {
+          const side = sides[index], state = states[index];
           side.renderer.bindContext(); side.renderer.invalidateGLState(); side.renderer.clear();
           side.renderer.saveClipRect(4, 4, 508, 508);
           side.renderer.align(side.rive.Fit.contain, side.rive.Alignment.center,
@@ -254,7 +223,6 @@ try {
           assert(side.gl.getError() === side.gl.NO_ERROR && !side.gl.isContextLost(), "GL error in " + spec.name);
           pixels.push(buffer);
         }
-        if (!pixels.length) continue;
         let changedPixels = 0, overTolerance = 0, nonAAPixels = 0, maxDelta = 0, visible = 0;
         const edge = (buffer, offset) => {
           const x = (offset / 4) % 512, y = Math.floor(offset / (512 * 4));
@@ -290,7 +258,7 @@ try {
     const pathPrograms = sides[1].programs.filter((program) =>
       ["path", "interiorTriangles", "featherAtlasBlit"].includes(program.type));
     const materialPrograms = pathPrograms.filter((program) =>
-      program.features.includes("ENABLE_HSL_BLEND_MODES"));
+      program.defines.includes("ENABLE_HSL_BLEND_MODES"));
     assert(materialPrograms.some((program) => Object.keys(program.usedCases).length > 0),
       "No material path program was used.");
     for (const program of materialPrograms) for (const name of Object.keys(program.usedCases)) {
@@ -299,7 +267,7 @@ try {
     }
     const programs = sides.map((side) => ({ gpu: side.gpu, meshDraws: side.meshDraws, programs: side.programs.filter((program) => program.type !== "aux") }));
     for (const side of sides) { side.renderer.bindContext(); for (const image of Object.values(side.bindings)) image.unref(); side.renderer.delete(); }
-    return { rows, programs, materialPathProgramsOnlyUsedWithMaterials: true };
+    return { rows, programs };
   }, { packages, cases, images });
   result.packages = packages.map(({ macros, ...metadata }) => metadata);
   result.manifest = manifest;
@@ -311,8 +279,8 @@ try {
       changedPixels: rows.reduce((sum, row) => sum + row.changedPixels, 0), maxDelta: Math.max(...rows.map((row) => row.maxDelta)),
       overTolerance: rows.reduce((sum, row) => sum + row.overTolerance, 0), nonAAPixels: rows.reduce((sum, row) => sum + row.nonAAPixels, 0) }];
   }));
-  result.programsWithoutM = result.programs[1].programs.every((program) => !program.features.includes("ENABLE_MODULATED_IMAGE"));
+  result.noModulatedImagePrograms = result.programs[1].programs.every((program) => !program.defines.includes("ENABLE_MODULATED_IMAGE"));
   await writeFile(join(output, "pixel-comparison.json"), JSON.stringify(result, null, 2) + "\n");
-  console.log(JSON.stringify({ summary: result.summary, programsWithoutM: result.programsWithoutM }, null, 2));
-  if (!result.programsWithoutM || result.rows.some((row) => row.nonAAPixels)) process.exitCode = 1;
+  console.log(JSON.stringify({ summary: result.summary, noModulatedImagePrograms: result.noModulatedImagePrograms }, null, 2));
+  if (!result.noModulatedImagePrograms || result.rows.some((row) => row.nonAAPixels)) process.exitCode = 1;
 } finally { await browser.close(); await new Promise((done) => server.close(done)); }
