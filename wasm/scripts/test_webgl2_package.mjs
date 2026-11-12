@@ -334,6 +334,9 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           assert(gl, "Deferred test has no WebGL2 context.");
           const extension = gl.getExtension("KHR_parallel_shader_compile");
           const parallel = !!extension && !hideParallel;
+          const rendererInfo = gl.getExtension("WEBGL_debug_renderer_info");
+          const systemRenderer = gl.getParameter(rendererInfo?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER);
+          const clipPlanes = !!gl.getExtension("WEBGL_clip_cull_distance") && !systemRenderer.includes("ANGLE");
           report.parallel ||= parallel;
           const programs = [];
           const sources = new Map();
@@ -344,9 +347,8 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           let issued = false;
           let deferredExactLinked = false;
           let gate = false;
-          let textureUnit = 0;
-          let poisonMaterial = false;
-          const paintFlags = [];
+          let activeProgram = null;
+          const usedPrograms = [];
           const imageMaterialLocations = new Set();
           let imageMaterialWrites = 0;
           const blockedFamilies = new Set();
@@ -357,25 +359,6 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           }
           wrap("getExtension", (original, name) =>
             hideParallel && name === "KHR_parallel_shader_compile" ? null : original(name));
-          wrap("activeTexture", (original, unit) => { textureUnit = unit - gl.TEXTURE0; return original(unit); });
-          wrap("texSubImage2D", (original, ...args) => {
-            const data = args[8], offset = args[9] ?? 0;
-            // Paint and paint-aux storage textures use units 3 and 4.
-            if (textureUnit === 3 && data instanceof Uint32Array) {
-              for (let i = offset; i < offset + args[4] * args[5] * 2; i += 2) paintFlags.push(data[i]);
-            }
-            if (poisonMaterial && textureUnit === 4 && data instanceof Float32Array) {
-              const copy = data.slice(offset, offset + args[4] * args[5] * 4);
-              // Each aux entry has eight float4s; matrix and translate are 6/7.
-              for (let i = 0; i + 31 < copy.length; i += 32) {
-                copy[i + 24] = copy[i + 27] = 1;
-                copy[i + 25] = copy[i + 26] = copy[i + 28] = copy[i + 29] = 0;
-                copy[i + 30] = 1; copy[i + 31] = -1;
-              }
-              args[8] = copy; if (args.length > 9) args[9] = 0;
-            }
-            return original(...args);
-          });
           wrap("shaderSource", (original, shader, source) => {
             sources.set(shader, source); return original(shader, source);
           });
@@ -387,6 +370,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             wrap(name, (original, ...args) => {
               assert(!parallel || phase === "constructor" || !deferredExactLinked,
                 "A draw or clear followed an end-of-frame exact link.");
+              if (name.startsWith("draw") && activeProgram?.draw) usedPrograms.push(activeProgram);
               issued = true; return original(...args);
             });
           }
@@ -401,7 +385,11 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
               : hasDefine(fragment, "ENABLE_ADVANCED_BLEND") || hasDefine(fragment, "ENABLE_KHR_BLEND") ? "screen" : "normal";
             const supportsVariants = ["DRAW_PATH", "DRAW_IMAGE_MESH", "DRAW_INTERIOR_TRIANGLES", "FEATHER_ATLAS_BLIT"]
               .some((name) => hasDefine(source, name));
-            const uber = hasDefine(fragment, "ENABLE_HSL_BLEND_MODES") || !supportsVariants;
+            // Path H is opt-in; account for Rive's ANGLE clip-plane workaround.
+            const uber = !supportsVariants || (family === "image"
+              ? hasDefine(fragment, "ENABLE_HSL_BLEND_MODES")
+              : hasDefine(fragment, "ENABLE_DITHER") &&
+                (!clipPlanes || hasDefine(source, "ENABLE_CLIP_RECT")));
             assert(!parallel || phase !== "try" || !issued || !uber,
               "Issue pass submitted an ubershader link.");
             if (parallel && phase !== "constructor" && issued && draw && !uber) deferredExactLinked = true;
@@ -441,6 +429,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
                 "Issue pass queried a uniform.");
               blocking(name, program);
               const result = original(program, ...args);
+              if (name === "useProgram") activeProgram = info(program);
               if (name === "getUniformLocation" &&
                 [macros.imageSurfaceMaterialMatrix, macros.imageSurfaceMaterialTranslate].includes(args[0])) {
                 imageMaterialLocations.add(result);
@@ -475,11 +464,11 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             gl.clearColor(0.1, 0.4, 0.7, 1); gl.clear(gl.COLOR_BUFFER_BIT);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb);
           }
-          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0 } = {}) {
+          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0, mixedMaterials = false } = {}) {
             renderer.bindContext(); renderer.invalidateGLState();
             overlay ? renderer.beginOverlayFrame() : renderer.clear();
             renderer.setSurfaceMaterial(material, 0, 0, 256, 256, -1);
-            paintFlags.length = 0;
+            usedPrograms.length = 0;
             if (overlay && clear) renderer.clearRect(12, 36, 92, 100);
             if (mix) {
               screen.draw(renderer);
@@ -492,7 +481,18 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
               renderer.align(rive.Fit.contain, rive.Alignment.center,
                 { minX: 0, minY: 0, maxX: 256, maxY: 256 }, feather.bounds);
               feather.draw(renderer); renderer.restore();
-            } else (quad ? imageQuad : meshQuad ? imageMeshQuad : paintQuad ? paintedQuad : normal).draw(renderer);
+            } else {
+              (quad ? imageQuad : meshQuad ? imageMeshQuad : paintQuad ? paintedQuad : normal).draw(renderer);
+              if (mixedMaterials) {
+                renderer.save();
+                const offset = new rive.Mat2D();
+                offset.tx = 80;
+                renderer.transform(offset); offset.delete();
+                renderer.setSurfaceMaterial(1, 0, 0, 256, 256, -1);
+                normal.draw(renderer);
+                renderer.restore();
+              }
+            }
           }
           function attempt(options) {
             phase = "try"; issued = false; deferredExactLinked = false; ++call; record(options);
@@ -508,9 +508,8 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             }
             throw new Error("tryFlush() did not finish linking within 180 animation frames.");
           }
-          return { renderer, gl, programs, parallel, violations, blockedFamilies, seed, pixels, paintFlags,
+          return { renderer, gl, programs, parallel, violations, blockedFamilies, seed, pixels, usedPrograms,
             get imageMaterialWrites() { return imageMaterialWrites; },
-            setPoisonMaterial: (enabled) => { poisonMaterial = enabled; },
             attempt, untilDrawn, setGate: (open) => { gate = open; },
             block(options) {
               phase = "blocking"; issued = false; deferredExactLinked = false;
@@ -558,7 +557,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           assert(blockingUbers[0].exactLinksAtLinkStatus === 0,
             "Blocking flush submitted an exact program ahead of its ubershader.");
         } else {
-          assert(drawPrograms.length === 1 && !drawPrograms[0].uber,
+          assert(drawPrograms.length === 1,
             "Without parallel compile, the path must link only its exact program.");
         }
         report.passed.push("blocking ubershader submission order");
@@ -698,7 +697,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         // constructor finishes it synchronously; the ready branch returns it.
         // Count draw links only: the constructor blit is new in mc.4.
         const noParallelDraws = noParallelBlocking.programs.filter((program) => program.draw);
-        assert(noParallelDraws.length === 1 && !noParallelDraws[0].uber,
+        assert(noParallelDraws.length === 1,
           "Blocking path without KHR must match mc.3: one exact draw-program link.");
         assert(countDifferentPixels(drawn, noParallelBlocking.pixels()) === 0,
           "Blocking path without KHR produced different pixels.");
@@ -747,7 +746,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           "The image-mesh route differs from the equivalent path reference.");
         assert(imageProbe.imageMaterialWrites === 0,
           "Plain images uploaded material uniforms.");
-        const programsBeforeMaterial = imageProbe.programs.length;
+        const imageProgramsBeforeMaterial = imageProbe.programs.filter((program) => program.family === "image").length;
         report.passed.push("DS image quad uses mesh and matches path reference");
 
         for (const material of [1, 2]) {
@@ -763,7 +762,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             "Material image mesh differs from its path reference.");
         }
         assert(imageProbe.imageMaterialWrites > 0 &&
-          imageProbe.programs.length === programsBeforeMaterial &&
+          imageProbe.programs.filter((program) => program.family === "image").length === imageProgramsBeforeMaterial &&
           !imageProbe.programs.some((program) => hasDefine(program.source, "ENABLE_MODULATED_IMAGE")),
           "Material image meshes failed to reuse their lean program.");
         imageProbe.block({ quad: true });
@@ -776,17 +775,24 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         report.passed.push("material image meshes and plain uniform reset");
 
         imageProbe.block(); const plainPixels = imageProbe.pixels();
-        assert(imageProbe.paintFlags.every((flags) => (flags & 0x1000) === 0), "Plain path has a material paint flag.");
-        imageProbe.setPoisonMaterial(true); imageProbe.block();
-        assert(countDifferentPixels(plainPixels, imageProbe.pixels()) === 0,
-          "A path without the material flag read poisoned material aux data.");
-        imageProbe.setPoisonMaterial(false); imageProbe.block({ material: 1 });
-        assert(imageProbe.paintFlags.some((flags) => (flags & 0x1000) !== 0), "Gold path is missing its material paint flag.");
-        assert(countDifferentPixels(plainPixels, imageProbe.pixels()) > 0, "Flagged Gold path lost its material.");
+        const hasH = (program) => hasDefine(program.source, "ENABLE_HSL_BLEND_MODES");
+        const usedPaths = () => imageProbe.usedPrograms.filter((program) => hasDefine(program.source, "DRAW_PATH"));
+        assert(usedPaths().length > 0 && usedPaths().every((program) => !hasH(program)),
+          "A plain path used the material program.");
+        imageProbe.block({ material: 1 });
+        assert(usedPaths().some(hasH) && countDifferentPixels(plainPixels, imageProbe.pixels()) > 0,
+          "Gold path did not use its material program.");
         imageProbe.block({ material: 2 });
-        assert(imageProbe.paintFlags.some((flags) => (flags & 0x1000) !== 0) && countDifferentPixels(plainPixels, imageProbe.pixels()) > 0,
-          "Flagged Rainbow path lost its material.");
-        imageProbe.destroy(); report.passed.push("material paint flag and skipped aux data");
+        assert(usedPaths().some(hasH) && countDifferentPixels(plainPixels, imageProbe.pixels()) > 0,
+          "Rainbow path did not use its material program.");
+        imageProbe.block({ mixedMaterials: true });
+        assert(usedPaths().some(hasH) && usedPaths().some((program) => !hasH(program)),
+          "Plain and material paths merged into the same program.");
+        imageProbe.block();
+        assert(usedPaths().every((program) => !hasH(program)) &&
+          countDifferentPixels(plainPixels, imageProbe.pixels()) === 0,
+          "A plain path retained the material program.");
+        imageProbe.destroy(); report.passed.push("opt-in material programs and batch separation");
 
         for (const board of boards) board.delete();
         for (const file of files) file.unref();

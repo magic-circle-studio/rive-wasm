@@ -1,4 +1,4 @@
-// Compare mc.4 and a candidate with exact programs disabled on a host GPU.
+// Compare staged packages with exact programs disabled on a host GPU.
 // PLAYWRIGHT_MODULE may point to an existing Playwright installation.
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
@@ -96,7 +96,7 @@ try {
     imageContext.fillStyle = "#e0308080";
     imageContext.fillRect(0, 0, 32, 32);
     const png = new Uint8Array(await (await imageCanvas.convertToBlob()).arrayBuffer());
-    // mc.4 cannot materialize an authored mesh; its image path is the reference.
+    // mc.4 needs an image-path reference; newer baselines use authored meshes.
     function imageFixture(mesh) {
       const bytes = [...new TextEncoder().encode("RIVE"), 7, 0, 0, 0];
       const uint = (value) => {
@@ -158,7 +158,7 @@ try {
         }))].sort();
         const type = defines.includes("DRAW_IMAGE_MESH") ? "imageMesh" : defines.includes("DRAW_PATH") ? "path"
           : defines.includes("DRAW_INTERIOR_TRIANGLES") ? "interiorTriangles" : defines.includes("FEATHER_ATLAS_BLIT") ? "featherAtlasBlit" : "aux";
-        const record = { type, defines, features: defines.filter((name) => features.test(name)), firstCase: current };
+        const record = { type, defines, features: defines.filter((name) => features.test(name)), firstCase: current, usedCases: {} };
         programs.push(record); records.set(program, record);
         originalLink(program);
       };
@@ -167,6 +167,7 @@ try {
       for (const name of ["drawArrays", "drawElements", "drawArraysInstanced", "drawElementsInstanced"]) {
         const original = gl[name].bind(gl);
         gl[name] = (...args) => {
+          if (current && active) active.usedCases[current] = (active.usedCases[current] ?? 0) + 1;
           if (current && active?.type === "imageMesh") meshDraws[current] = (meshDraws[current] ?? 0) + 1;
           return original(...args);
         };
@@ -206,7 +207,8 @@ try {
       const states = [];
       for (const side of sides) {
         side.renderer.bindContext(); side.setCurrent(spec.name);
-        const file = await side.rive.load(bytes ?? imageFixture(side === sides[1]));
+        const file = await side.rive.load(bytes ?? imageFixture(
+          side === sides[1] || packages[0].version !== "2.42.2-mc.4"));
         await Promise.all(Array.from(side.rive.images?.values() ?? [], (image) => image.decodePromise));
         const art = spec.synthetic ? file.defaultArtboard()
           : file.artboardByName(spec.artboard);
@@ -285,9 +287,19 @@ try {
         assert(sides[1].meshDraws[spec.name] > 0, "Cosmetic did not draw as a mesh: " + spec.name);
       }
     }
+    const pathPrograms = sides[1].programs.filter((program) =>
+      ["path", "interiorTriangles", "featherAtlasBlit"].includes(program.type));
+    const materialPrograms = pathPrograms.filter((program) =>
+      program.features.includes("ENABLE_HSL_BLEND_MODES"));
+    assert(materialPrograms.some((program) => Object.keys(program.usedCases).length > 0),
+      "No material path program was used.");
+    for (const program of materialPrograms) for (const name of Object.keys(program.usedCases)) {
+      assert(cases.find((spec) => spec.name === name).material !== 0,
+        "A plain scene used a material path program: " + name);
+    }
     const programs = sides.map((side) => ({ gpu: side.gpu, meshDraws: side.meshDraws, programs: side.programs.filter((program) => program.type !== "aux") }));
     for (const side of sides) { side.renderer.bindContext(); for (const image of Object.values(side.bindings)) image.unref(); side.renderer.delete(); }
-    return { rows, programs };
+    return { rows, programs, materialPathProgramsOnlyUsedWithMaterials: true };
   }, { packages, cases, images });
   result.packages = packages.map(({ macros, ...metadata }) => metadata);
   result.manifest = manifest;

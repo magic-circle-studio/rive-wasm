@@ -3,7 +3,7 @@
 This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
 official `rive-wasm` `2.42.2` tag (`dc4d3a12`) and the matching
 `rive-runtime` `runtime-v0.1.411` tag (`30742b4c`). The package version is
-`2.42.2-mc.5`. Both repositories replay the Magic Circle changes on these
+`2.42.2-mc.6`. Both repositories replay the Magic Circle changes on these
 upstream bases; the runtime submodule points to the Magic Circle mirror.
 
 The fork adds:
@@ -23,9 +23,10 @@ The fork adds:
   blocking and also applies the recorded rectangles. `setExactProgramsEnabled(false)`
   draws with each family's ubershader only, so no exact variant is linked
   or first drawn later; and
-- material storage reads only for paths with a surface material, cached
-  image quads in depth-stencil mode, and path ubershaders without modulated
-  image support unless a draw requests it. Image meshes share the path material
+- cached image quads in depth-stencil mode, and path ubershaders without
+  modulated images or material/HSL support unless a draw requests them.
+  Plain and material paths use separate batches. Image meshes retain material
+  support in their default program and share the path material
   mapping and shading, with material coordinates computed from fragment position
   and per-draw uniforms. Plain meshes add no vertex data or material uploads;
   a draw following a materialized mesh only resets the program's material mode.
@@ -98,12 +99,13 @@ to a host Chrome if needed, then run:
 
 ```sh
 node wasm/scripts/compare_webgl2_pixels.mjs \
-  /path/to/mc4-package js/npm/webgl2_advanced /path/to/magiccircle.gg /path/to/results
+  /path/to/mc5-final-package js/npm/webgl2_advanced /path/to/magiccircle.gg /path/to/results
 ```
 
-Synthetic authored meshes compare against mc.4's equivalent image-painted path,
-because mc.4 does not apply materials to authored meshes. The mc.5 results are
-retained in `benchmarks/lean-ubershaders-pixels.json`.
+Synthetic authored meshes use the same mesh in both builds; an mc.4 baseline
+uses its equivalent image-painted path because it does not materialize meshes.
+The mc.5 results are retained in `benchmarks/lean-ubershaders-pixels.json`, and
+the mc.6 comparison against mc.5 is in `benchmarks/optin-material-pixels.json`.
 
 ## Pet loading benchmark
 
