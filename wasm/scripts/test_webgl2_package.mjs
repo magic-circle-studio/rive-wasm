@@ -217,7 +217,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
 
       // Write tiny, deterministic RIVE v7 fixtures using generated core keys.
       // This keeps normal, screen, and feather paths independent of art assets.
-      function pathFixture({ screen = false, feather = false, meshPNG = null } = {}) {
+      function pathFixture({ screen = false, feather = false, meshPNG = null, imagePNG = null, pathReference = false } = {}) {
         const bytes = [...new TextEncoder().encode("RIVE"), 7, 0, 0, 0];
         const uint = (value) => {
           do {
@@ -239,13 +239,24 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           }
         };
         uint(23); uint(0); // Backboard.
-        if (meshPNG) {
+        const imageBytes = pathReference ? null : meshPNG ?? imagePNG;
+        if (imageBytes) {
           uint(105); prop(204, 0); prop(208, 32, "float"); prop(207, 32, "float"); uint(0);
-          uint(106); prop(212, meshPNG, "bytes"); uint(0);
+          uint(106); prop(212, imageBytes, "bytes"); uint(0);
         }
         uint(1); prop(7, 256, "float"); prop(8, 256, "float"); uint(0);
-        if (meshPNG) {
-          uint(100); prop(5, 0); prop(206, 0); prop(13, 176, "float"); prop(14, 176, "float"); uint(0);
+        if (imagePNG && pathReference) {
+          uint(3); prop(5, 0); prop(13, 176, "float"); prop(14, 176, "float"); uint(0);
+          uint(7); prop(5, 1); prop(20, 32, "float"); prop(21, 32, "float");
+          prop(123, 0, "float"); prop(124, 0, "float"); uint(0);
+          uint(20); prop(5, 1); uint(0);
+          // The flat PNG is equivalent to this solid-color path.
+          uint(18); prop(5, 3); prop(37, 0x80e03080, "color"); uint(0);
+          return new Uint8Array(bytes);
+        }
+        if (imageBytes) {
+          uint(100); prop(5, 0); prop(206, 0); prop(13, 176, "float"); prop(14, 176, "float"); prop(380, 0, "float"); prop(381, 0, "float"); uint(0);
+          if (imagePNG) return new Uint8Array(bytes);
           uint(109); prop(5, 1); prop(223, [0, 1, 2, 0, 2, 3], "bytes"); uint(0);
           for (const [x, y, u, v] of [[-32, -32, 0, 0], [32, -32, 1, 0], [32, 32, 1, 1], [-32, 32, 0, 1]]) {
             uint(108); prop(5, 2); prop(24, x, "float"); prop(25, y, "float");
@@ -303,6 +314,8 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         const screen = await boardFor(pathFixture({ screen: true }));
         const feather = await boardFor(pathFixture({ feather: true }));
         const mesh = await boardFor(pathFixture({ meshPNG: png }));
+        const imageQuad = await boardFor(pathFixture({ imagePNG: png }));
+        const paintedQuad = await boardFor(pathFixture({ imagePNG: png, pathReference: true }));
 
         function hasDefine(source, name) {
           return source.includes("#define " + macros[name] + " true\n");
@@ -327,6 +340,9 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           let issued = false;
           let deferredExactLinked = false;
           let gate = false;
+          let textureUnit = 0;
+          let poisonMaterial = false;
+          const paintFlags = [];
           const blockedFamilies = new Set();
           const methods = {};
           function wrap(name, fn) {
@@ -335,6 +351,25 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           }
           wrap("getExtension", (original, name) =>
             hideParallel && name === "KHR_parallel_shader_compile" ? null : original(name));
+          wrap("activeTexture", (original, unit) => { textureUnit = unit - gl.TEXTURE0; return original(unit); });
+          wrap("texSubImage2D", (original, ...args) => {
+            const data = args[8], offset = args[9] ?? 0;
+            // Paint and paint-aux storage textures use units 3 and 4.
+            if (textureUnit === 3 && data instanceof Uint32Array) {
+              for (let i = offset; i < offset + args[4] * args[5] * 2; i += 2) paintFlags.push(data[i]);
+            }
+            if (poisonMaterial && textureUnit === 4 && data instanceof Float32Array) {
+              const copy = data.slice(offset, offset + args[4] * args[5] * 4);
+              // Each aux entry has eight float4s; matrix and translate are 6/7.
+              for (let i = 0; i + 31 < copy.length; i += 32) {
+                copy[i + 24] = copy[i + 27] = 1;
+                copy[i + 25] = copy[i + 26] = copy[i + 28] = copy[i + 29] = 0;
+                copy[i + 30] = 1; copy[i + 31] = -1;
+              }
+              args[8] = copy; if (args.length > 9) args[9] = 0;
+            }
+            return original(...args);
+          });
           wrap("shaderSource", (original, shader, source) => {
             sources.set(shader, source); return original(shader, source);
           });
@@ -381,7 +416,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             if (parameter === extension?.COMPLETION_STATUS_KHR) {
               const polls = (item.polls.get(call) ?? 0) + 1;
               item.polls.set(call, polls);
-              assert(polls <= 1, "Program polled more than once in one tryFlush().");
+              assert(phase !== "try" || polls <= 1, "Program polled more than once in one tryFlush().");
               const ready = original(program, parameter);
               if (!gate || blockedFamilies.has(item.family)) return false;
               item.complete ||= ready;
@@ -422,9 +457,11 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             gl.clearColor(0.1, 0.4, 0.7, 1); gl.clear(gl.COLOR_BUFFER_BIT);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb);
           }
-          function record({ mix = false, overlay = false, feathered = false, clear = true } = {}) {
+          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, paintQuad = false, material = 0 } = {}) {
             renderer.bindContext(); renderer.invalidateGLState();
             overlay ? renderer.beginOverlayFrame() : renderer.clear();
+            renderer.setSurfaceMaterial(material, 0, 0, 256, 256, -1);
+            paintFlags.length = 0;
             if (overlay && clear) renderer.clearRect(12, 36, 92, 100);
             if (mix) {
               screen.draw(renderer);
@@ -437,7 +474,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
               renderer.align(rive.Fit.contain, rive.Alignment.center,
                 { minX: 0, minY: 0, maxX: 256, maxY: 256 }, feather.bounds);
               feather.draw(renderer); renderer.restore();
-            } else normal.draw(renderer);
+            } else (quad ? imageQuad : paintQuad ? paintedQuad : normal).draw(renderer);
           }
           function attempt(options) {
             phase = "try"; issued = false; deferredExactLinked = false; ++call; record(options);
@@ -453,7 +490,8 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             }
             throw new Error("tryFlush() did not finish linking within 180 animation frames.");
           }
-          return { renderer, gl, programs, parallel, violations, blockedFamilies, seed, pixels,
+          return { renderer, gl, programs, parallel, violations, blockedFamilies, seed, pixels, paintFlags,
+            setPoisonMaterial: (enabled) => { poisonMaterial = enabled; },
             attempt, untilDrawn, setGate: (open) => { gate = open; },
             block(options) {
               phase = "blocking"; issued = false; deferredExactLinked = false;
@@ -676,6 +714,36 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         assert(countDifferentPixels(featherPixels, feathered.pixels()) === 0,
           "Feather tryFlush() differs from blocking flush().");
         feathered.destroy(); report.passed.push("lazy feather completion gates");
+
+        const imageProbe = makeTarget({ exact: false });
+        imageProbe.block({ quad: true });
+        const quadPixels = imageProbe.pixels();
+        assert(countOpaquePixels(quadPixels) > 0, "The non-mesh Image fixture drew nothing.");
+        assert(imageProbe.programs.some((program) => program.draw && program.family === "image"),
+          "Depth-stencil drawImage did not use an image-mesh program.");
+        assert(!imageProbe.programs.some((program) => hasDefine(program.source, "ENABLE_MODULATED_IMAGE")),
+          "A plain image draw linked M with exact programs disabled.");
+        imageProbe.block({ paintQuad: true });
+        assert(countDifferentPixels(quadPixels, imageProbe.pixels()) === 0,
+          "The image-mesh route differs from the equivalent path reference.");
+        imageProbe.block({ quad: true, material: 1 });
+        assert(imageProbe.programs.some((program) => hasDefine(program.source, "ENABLE_MODULATED_IMAGE")),
+          "A material image did not retain the M-enabled path fallback.");
+        assert(countOpaquePixels(imageProbe.pixels()) > 0, "The material-image fallback drew nothing.");
+        report.passed.push("DS image quad uses mesh and matches path reference");
+
+        imageProbe.block(); const plainPixels = imageProbe.pixels();
+        assert(imageProbe.paintFlags.every((flags) => (flags & 0x1000) === 0), "Plain path has a material paint flag.");
+        imageProbe.setPoisonMaterial(true); imageProbe.block();
+        assert(countDifferentPixels(plainPixels, imageProbe.pixels()) === 0,
+          "A path without the material flag read poisoned material aux data.");
+        imageProbe.setPoisonMaterial(false); imageProbe.block({ material: 1 });
+        assert(imageProbe.paintFlags.some((flags) => (flags & 0x1000) !== 0), "Gold path is missing its material paint flag.");
+        assert(countDifferentPixels(plainPixels, imageProbe.pixels()) > 0, "Flagged Gold path lost its material.");
+        imageProbe.block({ material: 2 });
+        assert(imageProbe.paintFlags.some((flags) => (flags & 0x1000) !== 0) && countDifferentPixels(plainPixels, imageProbe.pixels()) > 0,
+          "Flagged Rainbow path lost its material.");
+        imageProbe.destroy(); report.passed.push("material paint flag and skipped aux data");
 
         for (const board of boards) board.delete();
         for (const file of files) file.unref();

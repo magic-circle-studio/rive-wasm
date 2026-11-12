@@ -3,7 +3,7 @@
 This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
 official `rive-wasm` `2.42.2` tag (`dc4d3a12`) and the matching
 `rive-runtime` `runtime-v0.1.411` tag (`30742b4c`). The package version is
-`2.42.2-mc.4`. Both repositories replay the Magic Circle changes on these
+`2.42.2-mc.5`. Both repositories replay the Magic Circle changes on these
 upstream bases; the runtime submodule points to the Magic Circle mirror.
 
 The fork adds:
@@ -16,13 +16,17 @@ The fork adds:
 - a generated JavaScript export of the same material shader source;
 - asynchronous ImageBitmap decoding before the first image upload, with
   premultiplied alpha, bitmap cleanup, and an HTMLImageElement fallback for
-  later contexts or browsers that cannot decode a bitmap; and
+  later contexts or browsers that cannot decode a bitmap;
 - `tryFlush()` for consuming a recorded frame without drawing until its
   shaders finish linking in the background, and overlay `clearRect()` for
   clearing atlas regions only when the frame draws. `flush()` remains
   blocking and also applies the recorded rectangles. `setExactProgramsEnabled(false)`
   draws with each family's ubershader only, so no exact variant is linked
-  or first drawn later.
+  or first drawn later; and
+- material storage reads only for paths with a surface material, cached
+  image quads in depth-stencil mode, and path ubershaders without modulated
+  image support unless a draw requests it. Images with a surface material
+  retain the image-painted path route because meshes have no material payload.
 
 `2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
 decoding before invoking `decodeImage`'s callback, reports invalid images as
@@ -78,6 +82,23 @@ cleanup, matching image uploads across two GL contexts, and teardown.
 Set `CHROME_BIN` if Chrome is not on PATH.
 Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 `RIVE_TEST_WASM` optionally restricts the binary under test.
+
+`wasm/scripts/compare_webgl2_pixels.mjs` compares two staged packages with
+exact programs disabled, using host-GPU ANGLE GL. It samples all 32 pets
+with hats and ties, splash files, avatar cosmetics, and Gold/Rainbow pets
+at frames 0, 30, 60, and 90. The output includes per-case pixel differences,
+asset/package hashes, and every linked draw program's defines. Save the
+baseline's generated `glsl.glsl.exports.h` beside its package before rebuilding
+(from `wasm/build/webgl2_advanced/bin/release/include/generated/shaders/`).
+Set `PLAYWRIGHT_MODULE` to an installed Playwright module and `CHROME_BIN`
+to a host Chrome if needed, then run:
+
+```sh
+node wasm/scripts/compare_webgl2_pixels.mjs \
+  /path/to/mc4-package js/npm/webgl2_advanced /path/to/magiccircle.gg /path/to/results
+```
+
+The mc.5 results are retained in `benchmarks/lean-ubershaders-pixels.json`.
 
 ## Pet loading benchmark
 
