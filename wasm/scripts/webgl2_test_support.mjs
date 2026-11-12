@@ -14,7 +14,7 @@ export async function findChrome() {
   throw new Error("Chrome was not found. Set CHROME_BIN to its executable.");
 }
 
-export function pathFixture({ screen = false, feather = false, meshPNG = null, imagePNG = null, pathReference = false, unitMesh = false } = {}) {
+export function pathFixture({ screen = false, feather = false, meshPNG = null, imagePNG = null, pathReference = false, unitMesh = false, clip = true } = {}) {
   const bytes = [...new TextEncoder().encode("RIVE"), 7, 0, 0, 0];
   const uint = (value) => {
     do {
@@ -41,7 +41,9 @@ export function pathFixture({ screen = false, feather = false, meshPNG = null, i
     uint(105); prop(204, 0); prop(208, 32, "float"); prop(207, 32, "float"); uint(0);
     uint(106); prop(212, imageBytes, "bytes"); uint(0);
   }
-  uint(1); prop(7, 256, "float"); prop(8, 256, "float"); uint(0);
+  uint(1); prop(7, 256, "float"); prop(8, 256, "float");
+  if (!clip) prop(196, 0); // LayoutComponent::clip.
+  uint(0);
   if (imagePNG && pathReference) {
     uint(3); prop(5, 0); prop(13, 176, "float"); prop(14, 176, "float"); uint(0);
     uint(7); prop(5, 1); prop(20, 32, "float"); prop(21, 32, "float");

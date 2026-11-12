@@ -116,7 +116,7 @@ try {
       const parallel = !!gl.getExtension("KHR_parallel_shader_compile");
       const sources = new Map(), attached = new Map(), programs = [], records = new Map();
       const meshDraws = {};
-      let current = null, active = null, linksComplete = false, statusReads = 0;
+      let current = null, active = null, linksComplete = false, statusReads = 0, drawCount = 0;
       const originalSource = gl.shaderSource.bind(gl), originalAttach = gl.attachShader.bind(gl), originalLink = gl.linkProgram.bind(gl);
       gl.shaderSource = (shader, source) => { sources.set(shader, source); originalSource(shader, source); };
       gl.attachShader = (program, shader) => {
@@ -151,6 +151,7 @@ try {
         const original = gl[name].bind(gl);
         gl[name] = (...args) => {
           if (current && active) active.usedCases[current] = (active.usedCases[current] ?? 0) + 1;
+          if (current && active && active.type !== "aux") ++drawCount;
           if (current && active?.type === "imageMesh") meshDraws[current] = (meshDraws[current] ?? 0) + 1;
           return original(...args);
         };
@@ -195,7 +196,8 @@ try {
         bindings[name] = renderer.makeImageFromGLTexture(texture, bitmap.width, bitmap.height);
         bitmap.close();
       }
-      sides.push({ rive, renderer, gl, gpu, parallel, programs, bindings, framebuffer, meshDraws, setCurrent: (name) => { current = name; } });
+      sides.push({ rive, renderer, gl, gpu, parallel, programs, bindings, framebuffer, meshDraws,
+        drawCount: () => drawCount, setCurrent: (name) => { current = name; } });
     }
     const digest = async (pixels) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", pixels)),
       (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -240,9 +242,10 @@ try {
           state.sm?.advance(dt); state.anim?.advance(dt); state.anim?.apply(1); state.art.advance(dt);
         }
         if (![0, 30, 60, 90].includes(frame)) continue;
-        const pixels = [];
+        const pixels = [], drawCounts = [];
         for (let index = 0; index < 2; index++) {
           const side = sides[index], state = states[index];
+          const beforeDraws = side.drawCount();
           side.renderer.bindContext(); side.renderer.invalidateGLState(); side.renderer.clear();
           side.renderer.saveClipRect(4, 4, 508, 508);
           side.renderer.align(side.rive.Fit.contain, side.rive.Alignment.center,
@@ -251,6 +254,7 @@ try {
           state.art.draw(side.renderer); side.renderer.restoreClipRect();
           if (checkLinkedPrograms) assert(side.renderer.tryFlush() === 0, "First tryFlush deferred " + spec.name);
           else side.renderer.flush();
+          drawCounts.push(side.drawCount() - beforeDraws);
           side.renderer.unbindGLInternalResources(); side.renderer.bindContext();
           side.gl.bindFramebuffer(side.gl.FRAMEBUFFER, side.framebuffer);
           const buffer = new Uint8Array(512 * 512 * 4);
@@ -276,6 +280,7 @@ try {
           if (delta > 2) { overTolerance++; if (!edge(pixels[0], i) && !edge(pixels[1], i)) nonAAPixels++; }
         }
         rows.push({ case: spec.name, group: spec.group, frame, changedPixels, maxDelta, overTolerance, nonAAPixels, visible,
+          drawCalls: { baseline: drawCounts[0], candidate: drawCounts[1] },
           baselineSha256: await digest(pixels[0]), candidateSha256: await digest(pixels[1]) });
       }
       for (let index = 0; index < 2; index++) {

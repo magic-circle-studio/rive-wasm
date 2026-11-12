@@ -24,8 +24,9 @@ The fork adds:
   cached as a bitmap (`BitmapCache`, which no Magic Circle file uses) flushes
   the target mid-frame, so neither guarantee holds for that frame; and
 - an ubershader-only WebGL2 renderer, cached image quads in depth-stencil mode,
-  and per-draw opt-in clip-rect, material/HSL and image-paint features. Plain and
-  material paths use separate batches. Plain srcOver and material meshes use
+  and per-draw opt-in clip-rect, material/HSL and image-paint features. Compatible
+  plain and material paths share batches whose requested features are ORed.
+  Plain srcOver and material meshes use
   separate programs. Mesh materials use fragment uniforms without adding vertex
   data. Plain meshes upload no material uniforms except a mode reset if a mesh
   with an HSL blend mode shares a program last used by a materialized mesh.

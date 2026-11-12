@@ -239,6 +239,8 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           return board;
         }
         const normal = await boardFor(pathFixture());
+        // Artboard stencil clips otherwise prevent merging on hosts without clip planes.
+        const batchPaths = await boardFor(pathFixture({ clip: false }));
         const screen = await boardFor(pathFixture({ screen: true }));
         const feather = await boardFor(pathFixture({ feather: true }));
         const mesh = await boardFor(pathFixture({ meshPNG: png }));
@@ -398,7 +400,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
                 { minX: 0, minY: 0, maxX: 256, maxY: 256 }, feather.bounds);
               feather.draw(renderer); renderer.restore();
             } else {
-              const board = quad ? imageQuad : meshQuad ? imageMeshQuad : paintQuad ? paintedQuad : normal;
+              const board = mixedMaterials ? batchPaths : quad ? imageQuad : meshQuad ? imageMeshQuad : paintQuad ? paintedQuad : normal;
               if (box) {
                 renderer.saveClipRect(...box);
                 renderer.align(rive.Fit.fill, rive.Alignment.center,
@@ -412,7 +414,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
                 offset.tx = 80;
                 renderer.transform(offset); offset.delete();
                 renderer.setSurfaceMaterial(1, 0, 0, 256, 256, -1);
-                normal.draw(renderer);
+                batchPaths.draw(renderer);
                 renderer.restore();
               }
             }
@@ -723,13 +725,14 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         assert(usedPaths().some(hasH) && countDifferentPixels(plainPixels, imageProbe.pixels()) > 0,
           "Rainbow path did not use its material program.");
         imageProbe.block({ mixedMaterials: true });
-        assert(usedPaths().some(hasH) && usedPaths().some((program) => !hasH(program)),
-          "Plain and material paths merged into the same program.");
+        // Compatible plain/material paths share a batch whose features are ORed.
+        assert(usedPaths().length > 0 && usedPaths().every(hasH),
+          "Compatible plain and material paths did not share the material program.");
         imageProbe.block();
         assert(usedPaths().every((program) => !hasH(program)) &&
           countDifferentPixels(plainPixels, imageProbe.pixels()) === 0,
           "A plain path retained the material program.");
-        imageProbe.destroy(); report.passed.push("opt-in material programs and batch separation");
+        imageProbe.destroy(); report.passed.push("opt-in material programs and mixed-path batching");
 
         for (const board of boards) board.delete();
         for (const file of files) file.unref();
