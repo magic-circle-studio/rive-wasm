@@ -264,6 +264,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           let gate = false;
           let activeProgram = null;
           const usedPrograms = [];
+          const blitRects = [];
           const imageMaterialLocations = new Set();
           let imageMaterialWrites = 0;
           const blockedFamilies = new Set();
@@ -284,6 +285,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           for (const name of ["clear", "drawArrays", "drawElements", "drawArraysInstanced", "drawElementsInstanced", "blitFramebuffer"]) {
             wrap(name, (original, ...args) => {
               if (name.startsWith("draw") && activeProgram?.draw) usedPrograms.push(activeProgram);
+              if (name === "blitFramebuffer") blitRects.push(args.slice(0, 4));
               issued = true; return original(...args);
             });
           }
@@ -296,7 +298,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
               source.includes("#define " + macros.FRAGMENT + "\n")) ?? "";
             const draw = programs.length >= 3;
             const atlas = hasDefine(source, "ATLAS_FEATHERED_FILL") || hasDefine(source, "ATLAS_FEATHERED_STROKE");
-            const family = programs.length === 2 ? "blit" : atlas ? "feather" : hasDefine(source, "DRAW_IMAGE_MESH") ? "image"
+            const family = programs.length === 2 ? "blit" : atlas ? (hasDefine(source, "ATLAS_FEATHERED_STROKE") ? "featherStroke" : "feather") : hasDefine(source, "DRAW_IMAGE_MESH") ? "image"
               : hasDefine(fragment, "ENABLE_ADVANCED_BLEND") || hasDefine(fragment, "ENABLE_KHR_BLEND") ? "screen" : "normal";
             programs.push({ program, source, family, draw: draw && !atlas, atlas,
               excluded: programs.length < 2, complete: false, polls: new Map(), phase });
@@ -364,7 +366,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             gl.clearColor(0.1, 0.4, 0.7, 1); gl.clear(gl.COLOR_BUFFER_BIT);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb);
           }
-          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0, mixedMaterials = false, modulatedOpacity = 1 } = {}) {
+          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0, mixedMaterials = false, modulatedOpacity = 1, box = null } = {}) {
             renderer.bindContext(); renderer.invalidateGLState();
             overlay ? renderer.beginOverlayFrame() : renderer.clear();
             renderer.setSurfaceMaterial(material, 0, 0, 256, 256, -1);
@@ -383,7 +385,14 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
                 { minX: 0, minY: 0, maxX: 256, maxY: 256 }, feather.bounds);
               feather.draw(renderer); renderer.restore();
             } else {
-              (quad ? imageQuad : meshQuad ? imageMeshQuad : paintQuad ? paintedQuad : normal).draw(renderer);
+              const board = quad ? imageQuad : meshQuad ? imageMeshQuad : paintQuad ? paintedQuad : normal;
+              if (box) {
+                renderer.saveClipRect(...box);
+                renderer.align(rive.Fit.fill, rive.Alignment.center,
+                  { minX: box[0], minY: box[1], maxX: box[2], maxY: box[3] }, board.bounds);
+              }
+              board.draw(renderer);
+              if (box) renderer.restoreClipRect();
               if (mixedMaterials) {
                 renderer.save();
                 const offset = new rive.Mat2D();
@@ -410,7 +419,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             }
             throw new Error("tryFlush() did not finish linking within 180 animation frames.");
           }
-          return { renderer, gl, programs, parallel, violations, blockedFamilies, seed, pixels, usedPrograms,
+          return { renderer, gl, programs, parallel, violations, blockedFamilies, seed, pixels, usedPrograms, blitRects,
             get imageMaterialWrites() { return imageMaterialWrites; },
             attempt, untilDrawn, setGate: (open) => { gate = open; },
             block(options) {
@@ -571,6 +580,8 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         if (feathered.parallel) {
           assert(featherPending > 0, "Feather frame was not pending.");
           assert(countDifferentPixels(featherBefore, feathered.pixels()) === 0, "Pending feather frame changed the target.");
+          // The fixture only fills, so a pending stroke program must not block it.
+          feathered.blockedFamilies.add("featherStroke");
           feathered.setGate(true); await feathered.untilDrawn(featherOptions);
         } else assert(featherPending === 0, "Feather fallback was not immediate.");
         const featherPixels = feathered.pixels();
@@ -597,6 +608,12 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         const meshHasH = imageProbe.programs.some((program) => program.family === "image" && hasDefine(program.source, "ENABLE_HSL_BLEND_MODES"));
         const imageProgramsBeforeMaterial = imageProbe.programs.filter((program) => program.family === "image").length;
         report.passed.push("DS image quad uses mesh and matches path reference");
+        imageProbe.blitRects.length = 0;
+        imageProbe.block({ quad: true, overlay: true, clear: false, box: [0, 0, 64, 64] });
+        assert(imageProbe.blitRects.length > 0 &&
+          imageProbe.blitRects.every(([x0, y0, x1, y1]) => x1 - x0 <= 64 && y1 - y0 <= 64),
+          "An overlay image quad updated beyond its clip: " + JSON.stringify(imageProbe.blitRects));
+        report.passed.push("overlay image quad updates only its bounds");
         imageProbe.block({ quad: true, modulatedOpacity: 0.5 });
         const halfOpacityPixels = imageProbe.pixels();
         imageProbe.block({ paintQuad: true, modulatedOpacity: 0.5 });

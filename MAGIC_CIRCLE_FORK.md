@@ -20,7 +20,9 @@ The fork adds:
 - `tryFlush()` consumes a recorded frame and draws only when every required
   shader is linked; a pending frame leaves its target untouched. Overlay
   `clearRect()` clears recorded atlas regions only when the frame draws.
-  `flush()` remains blocking and honors the same rectangles; and
+  `flush()` remains blocking and honors the same rectangles. An artboard
+  cached as a bitmap (`BitmapCache`, which no Magic Circle file uses) flushes
+  the target mid-frame, so neither guarantee holds for that frame; and
 - an ubershader-only WebGL2 renderer, cached image quads in depth-stencil mode,
   and per-draw opt-in path material/HSL and image-paint features. Plain and
   material paths use separate batches. Image meshes switch materials through
@@ -82,7 +84,8 @@ texture-backed images, decode readiness and failures, Blob URL and bitmap
 cleanup, matching image uploads across two GL contexts, and teardown. It also
 checks pending-frame preservation, completion-only polling, mixed shader
 families, lazy feather programs, overlay clear orientation, extension fallback,
-material program selection, mesh uniform resets, and modulated image opacity.
+material program selection, mesh uniform resets, modulated image opacity, and
+image-quad update bounds.
 Set `CHROME_BIN` if Chrome is not on PATH.
 Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 `RIVE_TEST_WASM` optionally restricts the binary under test.
