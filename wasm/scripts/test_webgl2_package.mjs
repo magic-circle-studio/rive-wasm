@@ -217,7 +217,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
 
       // Write tiny, deterministic RIVE v7 fixtures using generated core keys.
       // This keeps normal, screen, and feather paths independent of art assets.
-      function pathFixture({ screen = false, feather = false, meshPNG = null, imagePNG = null, pathReference = false } = {}) {
+      function pathFixture({ screen = false, feather = false, meshPNG = null, imagePNG = null, pathReference = false, unitMesh = false } = {}) {
         const bytes = [...new TextEncoder().encode("RIVE"), 7, 0, 0, 0];
         const uint = (value) => {
           do {
@@ -258,7 +258,10 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           uint(100); prop(5, 0); prop(206, 0); prop(13, 176, "float"); prop(14, 176, "float"); prop(380, 0, "float"); prop(381, 0, "float"); uint(0);
           if (imagePNG) return new Uint8Array(bytes);
           uint(109); prop(5, 1); prop(223, [0, 1, 2, 0, 2, 3], "bytes"); uint(0);
-          for (const [x, y, u, v] of [[-32, -32, 0, 0], [32, -32, 1, 0], [32, 32, 1, 1], [-32, 32, 0, 1]]) {
+          const vertices = unitMesh
+            ? [[0, 0, 0, 0], [32, 0, 1, 0], [32, 32, 1, 1], [0, 32, 0, 1]]
+            : [[-32, -32, 0, 0], [32, -32, 1, 0], [32, 32, 1, 1], [-32, 32, 0, 1]];
+          for (const [x, y, u, v] of vertices) {
             uint(108); prop(5, 2); prop(24, x, "float"); prop(25, y, "float");
             prop(215, u, "float"); prop(216, v, "float"); uint(0);
           }
@@ -315,6 +318,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         const feather = await boardFor(pathFixture({ feather: true }));
         const mesh = await boardFor(pathFixture({ meshPNG: png }));
         const imageQuad = await boardFor(pathFixture({ imagePNG: png }));
+        const imageMeshQuad = await boardFor(pathFixture({ meshPNG: png, unitMesh: true }));
         const paintedQuad = await boardFor(pathFixture({ imagePNG: png, pathReference: true }));
 
         function hasDefine(source, name) {
@@ -343,6 +347,8 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           let textureUnit = 0;
           let poisonMaterial = false;
           const paintFlags = [];
+          const imageMaterialLocations = new Set();
+          let imageMaterialWrites = 0;
           const blockedFamilies = new Set();
           const methods = {};
           function wrap(name, fn) {
@@ -433,7 +439,19 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             wrap(name, (original, program, ...args) => {
               assert(!parallel || name === "useProgram" || phase !== "try" || !issued,
                 "Issue pass queried a uniform.");
-              blocking(name, program); return original(program, ...args);
+              blocking(name, program);
+              const result = original(program, ...args);
+              if (name === "getUniformLocation" &&
+                [macros.imageSurfaceMaterialMatrix, macros.imageSurfaceMaterialTranslate].includes(args[0])) {
+                imageMaterialLocations.add(result);
+              }
+              return result;
+            });
+          }
+          for (const name of ["uniform4f", "uniform4fv"]) {
+            wrap(name, (original, location, ...args) => {
+              if (imageMaterialLocations.has(location)) imageMaterialWrites++;
+              return original(location, ...args);
             });
           }
           const renderer = rive.makeRenderer(canvas);
@@ -457,7 +475,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             gl.clearColor(0.1, 0.4, 0.7, 1); gl.clear(gl.COLOR_BUFFER_BIT);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb);
           }
-          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, paintQuad = false, material = 0 } = {}) {
+          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0 } = {}) {
             renderer.bindContext(); renderer.invalidateGLState();
             overlay ? renderer.beginOverlayFrame() : renderer.clear();
             renderer.setSurfaceMaterial(material, 0, 0, 256, 256, -1);
@@ -474,7 +492,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
               renderer.align(rive.Fit.contain, rive.Alignment.center,
                 { minX: 0, minY: 0, maxX: 256, maxY: 256 }, feather.bounds);
               feather.draw(renderer); renderer.restore();
-            } else (quad ? imageQuad : paintQuad ? paintedQuad : normal).draw(renderer);
+            } else (quad ? imageQuad : meshQuad ? imageMeshQuad : paintQuad ? paintedQuad : normal).draw(renderer);
           }
           function attempt(options) {
             phase = "try"; issued = false; deferredExactLinked = false; ++call; record(options);
@@ -491,6 +509,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             throw new Error("tryFlush() did not finish linking within 180 animation frames.");
           }
           return { renderer, gl, programs, parallel, violations, blockedFamilies, seed, pixels, paintFlags,
+            get imageMaterialWrites() { return imageMaterialWrites; },
             setPoisonMaterial: (enabled) => { poisonMaterial = enabled; },
             attempt, untilDrawn, setGate: (open) => { gate = open; },
             block(options) {
@@ -726,11 +745,35 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         imageProbe.block({ paintQuad: true });
         assert(countDifferentPixels(quadPixels, imageProbe.pixels()) === 0,
           "The image-mesh route differs from the equivalent path reference.");
-        imageProbe.block({ quad: true, material: 1 });
-        assert(imageProbe.programs.some((program) => hasDefine(program.source, "ENABLE_MODULATED_IMAGE")),
-          "A material image did not retain the M-enabled path fallback.");
-        assert(countOpaquePixels(imageProbe.pixels()) > 0, "The material-image fallback drew nothing.");
+        assert(imageProbe.imageMaterialWrites === 0,
+          "Plain images uploaded material uniforms.");
+        const programsBeforeMaterial = imageProbe.programs.length;
         report.passed.push("DS image quad uses mesh and matches path reference");
+
+        for (const material of [1, 2]) {
+          imageProbe.block({ meshQuad: true, material });
+          const materialPixels = imageProbe.pixels();
+          assert(countDifferentPixels(quadPixels, materialPixels) > 0,
+            "An authored image mesh lost its surface material.");
+          imageProbe.block({ quad: true, material });
+          assert(countDifferentPixels(materialPixels, imageProbe.pixels()) === 0,
+            "Materialized drawImage differs from an authored image mesh.");
+          imageProbe.block({ paintQuad: true, material });
+          assert(countDifferentPixels(materialPixels, imageProbe.pixels()) === 0,
+            "Material image mesh differs from its path reference.");
+        }
+        assert(imageProbe.imageMaterialWrites > 0 &&
+          imageProbe.programs.length === programsBeforeMaterial &&
+          !imageProbe.programs.some((program) => hasDefine(program.source, "ENABLE_MODULATED_IMAGE")),
+          "Material image meshes failed to reuse their lean program.");
+        imageProbe.block({ quad: true });
+        const writesAfterReset = imageProbe.imageMaterialWrites;
+        imageProbe.block({ quad: true });
+        assert(imageProbe.imageMaterialWrites === writesAfterReset &&
+          countDifferentPixels(quadPixels, imageProbe.pixels()) === 0,
+          "Plain image meshes retained material state or uploaded uniforms.");
+        assert(imageProbe.violations.length === 0, imageProbe.violations.join("; "));
+        report.passed.push("material image meshes and plain uniform reset");
 
         imageProbe.block(); const plainPixels = imageProbe.pixels();
         assert(imageProbe.paintFlags.every((flags) => (flags & 0x1000) === 0), "Plain path has a material paint flag.");

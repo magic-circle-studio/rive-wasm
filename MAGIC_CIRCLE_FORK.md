@@ -25,8 +25,10 @@ The fork adds:
   or first drawn later; and
 - material storage reads only for paths with a surface material, cached
   image quads in depth-stencil mode, and path ubershaders without modulated
-  image support unless a draw requests it. Images with a surface material
-  retain the image-painted path route because meshes have no material payload.
+  image support unless a draw requests it. Image meshes share the path material
+  mapping and shading, with material coordinates computed from fragment position
+  and per-draw uniforms. Plain meshes add no vertex data or material uploads;
+  a draw following a materialized mesh only resets the program's material mode.
 
 `2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
 decoding before invoking `decodeImage`'s callback, reports invalid images as
@@ -85,10 +87,11 @@ Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 
 `wasm/scripts/compare_webgl2_pixels.mjs` compares two staged packages with
 exact programs disabled, using host-GPU ANGLE GL. It samples all 32 pets
-with hats and ties, splash files, avatar cosmetics, and Gold/Rainbow pets
-at frames 0, 30, 60, and 90. The output includes per-case pixel differences,
-asset/package hashes, and every linked draw program's defines. Save the
-baseline's generated `glsl.glsl.exports.h` beside its package before rebuilding
+with hats and ties in plain, Gold, and Rainbow, splash files, avatar cosmetics,
+and Gold/Rainbow pets at frames 0, 30, 60, and 90. The output includes per-case
+pixel differences, asset/package hashes, and every linked draw program's defines.
+Save the baseline's generated `glsl.glsl.exports.h` beside its package before
+rebuilding
 (from `wasm/build/webgl2_advanced/bin/release/include/generated/shaders/`).
 Set `PLAYWRIGHT_MODULE` to an installed Playwright module and `CHROME_BIN`
 to a host Chrome if needed, then run:
@@ -98,7 +101,9 @@ node wasm/scripts/compare_webgl2_pixels.mjs \
   /path/to/mc4-package js/npm/webgl2_advanced /path/to/magiccircle.gg /path/to/results
 ```
 
-The mc.5 results are retained in `benchmarks/lean-ubershaders-pixels.json`.
+Synthetic authored meshes compare against mc.4's equivalent image-painted path,
+because mc.4 does not apply materials to authored meshes. The mc.5 results are
+retained in `benchmarks/lean-ubershaders-pixels.json`.
 
 ## Pet loading benchmark
 

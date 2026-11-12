@@ -26,10 +26,18 @@ for (const directory of [baseline, candidate]) {
 const petsPath = "client/raw-assets/rive/pets{m}";
 const pets = (await readdir(join(assets, petsPath))).filter((name) => name.endsWith(".riv")).sort();
 if (pets.length !== 32) throw new Error("Expected the 32 shipped pet files.");
-const cases = pets.flatMap((name) => ["hatImage", "tieImage"].map((slot) => ({
-  name: name.slice(0, -4) + ":" + slot, group: slot, path: petsPath + "/" + name,
-  artboard: name.slice(0, -4), slots: { [slot]: slot === "hatImage" ? "pet" : "tie" }, material: 0,
-})));
+const materials = [["Plain", 0], ["Gold", 1], ["Rainbow", 2]];
+const cases = pets.flatMap((name) => ["hatImage", "tieImage"].flatMap((slot) =>
+  materials.map(([label, material]) => ({
+    name: name.slice(0, -4) + ":" + slot + ":" + label,
+    group: slot + ":" + label, path: petsPath + "/" + name,
+    artboard: name.slice(0, -4),
+    slots: { [slot]: slot === "hatImage" ? "pet" : "tie" }, material,
+  }))));
+for (const [label, material] of materials) {
+  cases.push({ name: "mesh-reference:" + label, group: "meshReference",
+    synthetic: true, slots: {}, material });
+}
 for (const name of (await readdir(join(assets, "client/src/boot/splashscreen"))).filter((name) => name.endsWith(".riv")).sort()) {
   cases.push({ name, group: "splash", path: "client/src/boot/splashscreen/" + name,
     artboard: "MC_MainLoader_Horz", slots: {}, material: 0 });
@@ -52,7 +60,7 @@ const images = {
   top: "client/raw-assets/cosmetic{m}{nc}/Top_DiscordPopsicle.png",
 };
 const manifest = [];
-for (const path of new Set([...cases.map((item) => item.path), ...Object.values(images)])) {
+for (const path of new Set([...cases.map((item) => item.path).filter(Boolean), ...Object.values(images)])) {
   manifest.push({ path, sha256: hash(await readFile(join(assets, path))) });
 }
 const mime = { ".mjs": "text/javascript", ".wasm": "application/wasm", ".png": "image/png" };
@@ -83,6 +91,46 @@ try {
   const result = await page.evaluate(async ({ packages, cases, images }) => {
     const sides = [];
     const assert = (condition, message) => { if (!condition) throw new Error(message); };
+    const imageCanvas = new OffscreenCanvas(32, 32);
+    const imageContext = imageCanvas.getContext("2d");
+    imageContext.fillStyle = "#e0308080";
+    imageContext.fillRect(0, 0, 32, 32);
+    const png = new Uint8Array(await (await imageCanvas.convertToBlob()).arrayBuffer());
+    // mc.4 cannot materialize an authored mesh; its image path is the reference.
+    function imageFixture(mesh) {
+      const bytes = [...new TextEncoder().encode("RIVE"), 7, 0, 0, 0];
+      const uint = (value) => {
+        do {
+          const byte = value & 127; value >>>= 7;
+          bytes.push(byte | (value ? 128 : 0));
+        } while (value);
+      };
+      const prop = (key, value, type = "uint") => {
+        uint(key);
+        if (type === "uint") uint(value);
+        else if (type === "bytes") { uint(value.length); bytes.push(...value); }
+        else {
+          const buffer = new ArrayBuffer(4);
+          new DataView(buffer).setFloat32(0, value, true);
+          bytes.push(...new Uint8Array(buffer));
+        }
+      };
+      uint(23); uint(0);
+      uint(105); prop(204, 0); prop(208, 32, "float"); prop(207, 32, "float"); uint(0);
+      uint(106); prop(212, png, "bytes"); uint(0);
+      uint(1); prop(7, 256, "float"); prop(8, 256, "float"); uint(0);
+      uint(100); prop(5, 0); prop(206, 0);
+      prop(13, 176, "float"); prop(14, 176, "float");
+      prop(380, 0, "float"); prop(381, 0, "float"); uint(0);
+      if (mesh) {
+        uint(109); prop(5, 1); prop(223, [0, 1, 2, 0, 2, 3], "bytes"); uint(0);
+        for (const [x, y, u, v] of [[0, 0, 0, 0], [32, 0, 1, 0], [32, 32, 1, 1], [0, 32, 0, 1]]) {
+          uint(108); prop(5, 2); prop(24, x, "float"); prop(25, y, "float");
+          prop(215, u, "float"); prop(216, v, "float"); uint(0);
+        }
+      }
+      return new Uint8Array(bytes);
+    }
     const features = /^ENABLE_(CLIPPING|CLIP_RECT|ADVANCED_BLEND|FEATHER|EVEN_ODD|NESTED_CLIPPING|HSL_BLEND_MODES|DITHER|MODULATED_IMAGE)$/;
     for (const [index, prefix] of ["baseline", "candidate"].entries()) {
       const { default: init } = await import("/" + prefix + "/webgl2_advanced.mjs");
@@ -102,9 +150,12 @@ try {
         attached.get(program).push(shader); originalAttach(program, shader);
       };
       gl.linkProgram = (program) => {
-        const defines = [...new Set((attached.get(program) ?? []).flatMap((shader) =>
-          Array.from(sources.get(shader).split("#ifndef")[0].matchAll(/^#define\s+(\w+)/gm),
-            ([, name]) => packages[index].macros[name] ?? name)))].sort();
+        const defines = [...new Set((attached.get(program) ?? []).flatMap((shader) => {
+          const source = sources.get(shader);
+          const glslMarker = source.match(/#define (\w+)\n#ifndef/)?.[1];
+          return Array.from(source.split("#ifndef")[0].matchAll(/^#define\s+(\w+)/gm),
+            ([, name]) => packages[index].macros[name] ?? (name === glslMarker ? "GLSL" : name));
+        }))].sort();
         const type = defines.includes("DRAW_IMAGE_MESH") ? "imageMesh" : defines.includes("DRAW_PATH") ? "path"
           : defines.includes("DRAW_INTERIOR_TRIANGLES") ? "interiorTriangles" : defines.includes("FEATHER_ATLAS_BLIT") ? "featherAtlasBlit" : "aux";
         const record = { type, defines, features: defines.filter((name) => features.test(name)), firstCase: current };
@@ -150,14 +201,18 @@ try {
       (byte) => byte.toString(16).padStart(2, "0")).join("");
     const rows = [];
     for (const spec of cases) {
-      const bytes = new Uint8Array(await (await fetch("/assets/" + spec.path)).arrayBuffer());
+      const bytes = spec.synthetic ? null
+        : new Uint8Array(await (await fetch("/assets/" + spec.path)).arrayBuffer());
       const states = [];
       for (const side of sides) {
         side.renderer.bindContext(); side.setCurrent(spec.name);
-        const file = await side.rive.load(bytes);
+        const file = await side.rive.load(bytes ?? imageFixture(side === sides[1]));
         await Promise.all(Array.from(side.rive.images?.values() ?? [], (image) => image.decodePromise));
-        const art = file.artboardByName(spec.artboard); assert(art, "Missing artboard " + spec.artboard);
-        const vm = spec.group === "splash" ? null : file.defaultArtboardViewModel(art)?.instance();
+        const art = spec.synthetic ? file.defaultArtboard()
+          : file.artboardByName(spec.artboard);
+        assert(art, "Missing artboard " + spec.artboard);
+        const vm = spec.group === "splash" || spec.synthetic ? null
+          : file.defaultArtboardViewModel(art)?.instance();
         if (vm) {
           for (const property of vm.getProperties()) {
             if (property.type === "image") vm.image(property.name).value(null);
@@ -225,7 +280,8 @@ try {
     }
     for (const spec of cases) {
       assert(rows.some((row) => row.case === spec.name && row.visible > 0), "Invisible case " + spec.name);
-      if (spec.group === "hatImage" || spec.group === "tieImage") {
+      if (spec.group.startsWith("hatImage:") ||
+        spec.group.startsWith("tieImage:") || spec.synthetic) {
         assert(sides[1].meshDraws[spec.name] > 0, "Cosmetic did not draw as a mesh: " + spec.name);
       }
     }
