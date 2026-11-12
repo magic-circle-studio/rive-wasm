@@ -30,10 +30,12 @@ The fork adds:
   data. Plain meshes upload no material uniforms except a mode reset if a mesh
   with an HSL blend mode shares a program last used by a materialized mesh.
 
-`linkDrawPrograms()` synchronously links Magic Garden's depth-stencil draw
-programs before revealing the loading animation on contexts without parallel
-shader compilation. It also works synchronously with the extension present;
-renderers that do not call it retain lazy linking through `tryFlush()`/`flush()`.
+`linkDrawPrograms()` starts Magic Garden's depth-stencil draw-program links in
+the background with `KHR_parallel_shader_compile`, without reading link status.
+Without the extension it links synchronously, before revealing the loading
+animation. `tryFlush()` polls and finishes only the programs its frame needs;
+unused background programs remain unqueried. Renderers that do not call it
+retain lazy linking through `tryFlush()`/`flush()`.
 
 `2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
 decoding before invoking `decodeImage`'s callback, reports invalid images as
@@ -95,12 +97,15 @@ image-quad update bounds.
 Set `CHROME_BIN` if Chrome is not on PATH.
 Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 `RIVE_TEST_WASM` optionally restricts the binary under test.
+Set `RIVE_TEST_HIDE_PARALLEL=1` to run the browser checks with the parallel
+compile extension hidden from every context.
 Set `RIVE_TEST_GAME_ROOT` to the Magic Circle game checkout and
 `PLAYWRIGHT_MODULE` to an installed Playwright module to include the 209-case
 content check on the packed package. It calls `linkDrawPrograms()` immediately
 after creation, requires seven programs (six without clip-plane support) to be
-linked, and rejects further draw-program links with parallel compilation
-available and hidden. It uses the
+submitted without status reads with KHR, or linked synchronously without it.
+After allowing background links to finish without polling, every case must draw
+on its first `tryFlush()` with no further draw-program links. It uses the
 host GPU; changes to shipped content that need another program fail this check.
 
 `wasm/scripts/compare_webgl2_pixels.mjs` compares two staged packages with

@@ -116,7 +116,7 @@ try {
       const parallel = !!gl.getExtension("KHR_parallel_shader_compile");
       const sources = new Map(), attached = new Map(), programs = [], records = new Map();
       const meshDraws = {};
-      let current = null, active = null, linksComplete = false;
+      let current = null, active = null, linksComplete = false, statusReads = 0;
       const originalSource = gl.shaderSource.bind(gl), originalAttach = gl.attachShader.bind(gl), originalLink = gl.linkProgram.bind(gl);
       gl.shaderSource = (shader, source) => { sources.set(shader, source); originalSource(shader, source); };
       gl.attachShader = (program, shader) => {
@@ -140,6 +140,7 @@ try {
       };
       const originalParameter = gl.getProgramParameter.bind(gl);
       gl.getProgramParameter = (program, name) => {
+        if (name === gl.LINK_STATUS || name === 0x91b1) ++statusReads;
         const value = originalParameter(program, name);
         if (name === gl.LINK_STATUS && records.has(program)) records.get(program).linked = value;
         return value;
@@ -156,13 +157,20 @@ try {
       }
       const renderer = rive.makeRenderer(canvas); renderer.setExactProgramsEnabled?.(false);
       if (checkLinkedPrograms) {
+        const readsBefore = statusReads;
         renderer.linkDrawPrograms();
         const drawPrograms = programs.filter((program) => program.type !== "aux");
         const clipped = drawPrograms.some((program) => program.defines.includes("ENABLE_CLIP_RECT"));
-        assert(drawPrograms.length === (clipped ? 7 : 6) && drawPrograms.every((program) => program.linked),
-          "linkDrawPrograms must finish seven draw programs (six without clip planes) synchronously");
+        assert(drawPrograms.length === (clipped ? 7 : 6), "linkDrawPrograms submitted the wrong set");
+        assert(parallel ? statusReads === readsBefore : drawPrograms.every((program) => program.linked),
+          "linkDrawPrograms must submit without status reads with KHR, and finish synchronously without it");
         linksComplete = true;
         renderer.linkDrawPrograms(); // Repeated calls are cache hits.
+        if (parallel) {
+          // Let the host GPU finish linking without polling programs no frame needs.
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          assert(statusReads === readsBefore, "Unused background programs were polled");
+        }
       }
       renderer.bindContext();
       const target = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, target);
@@ -240,7 +248,9 @@ try {
           side.renderer.align(side.rive.Fit.contain, side.rive.Alignment.center,
             { minX: 0, minY: 0, maxX: 512, maxY: 512 }, state.art.bounds);
           side.renderer.setSurfaceMaterial(spec.material, 0, 0, 512, 512, frame / 60);
-          state.art.draw(side.renderer); side.renderer.restoreClipRect(); side.renderer.flush();
+          state.art.draw(side.renderer); side.renderer.restoreClipRect();
+          if (checkLinkedPrograms) assert(side.renderer.tryFlush() === 0, "First tryFlush deferred " + spec.name);
+          else side.renderer.flush();
           side.renderer.unbindGLInternalResources(); side.renderer.bindContext();
           side.gl.bindFramebuffer(side.gl.FRAMEBUFFER, side.framebuffer);
           const buffer = new Uint8Array(512 * 512 * 4);

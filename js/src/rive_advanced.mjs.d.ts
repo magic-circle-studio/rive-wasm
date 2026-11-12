@@ -244,9 +244,10 @@ export declare class RendererWrapper {
    */
   tryFlush(): number;
   /**
-   * WebGL2 only. Synchronously links Magic Garden's depth-stencil draw programs.
-   * Call before revealing the loading animation where parallel compilation is
-   * unavailable. Does not draw or consume a recorded frame.
+   * WebGL2 only. Starts Magic Garden's depth-stencil draw-program links in the
+   * background with KHR_parallel_shader_compile, without reading link status.
+   * Without the extension, links synchronously. Does not draw or consume a frame.
+   * tryFlush() polls and finishes only the programs its recorded frame needs.
    */
   linkDrawPrograms(): void;
   /**

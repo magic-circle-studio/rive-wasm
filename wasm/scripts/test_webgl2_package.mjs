@@ -101,6 +101,12 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
     <canvas id="canvas" width="256" height="256"></canvas>
     <script type="module">
       import { pathFixture } from "/webgl2_test_support.mjs";
+      if (${JSON.stringify(process.env.RIVE_TEST_HIDE_PARALLEL === "1")}) {
+        const getExtension = WebGL2RenderingContext.prototype.getExtension;
+        WebGL2RenderingContext.prototype.getExtension = function(name) {
+          return name === "KHR_parallel_shader_compile" ? null : getExtension.call(this, name);
+        };
+      }
       const result = document.querySelector("#result");
       const browserMessages = [];
       for (const method of ["error", "warn"]) {
@@ -301,7 +307,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             const family = programs.length === 2 ? "blit" : atlas ? (hasDefine(source, "ATLAS_FEATHERED_STROKE") ? "featherStroke" : "feather") : hasDefine(source, "DRAW_IMAGE_MESH") ? "image"
               : hasDefine(fragment, "ENABLE_ADVANCED_BLEND") || hasDefine(fragment, "ENABLE_KHR_BLEND") ? "screen" : "normal";
             programs.push({ program, source, family, draw: draw && !atlas, atlas,
-              excluded: programs.length < 2, complete: false, polls: new Map(), phase });
+              excluded: programs.length < 2, complete: false, polls: new Map(), statusReads: [], phase });
             return original(program);
           });
           const info = (program) => programs.find((item) => item.program === program);
@@ -314,6 +320,9 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           wrap("getProgramParameter", (original, program, parameter) => {
             assert(!parallel || phase !== "try" || !issued, "Issue pass queried a program.");
             const item = info(program);
+            if (parameter === gl.LINK_STATUS || parameter === extension?.COMPLETION_STATUS_KHR) {
+              item?.statusReads.push({ parameter, phase });
+            }
             if (parameter === extension?.COMPLETION_STATUS_KHR) {
               const polls = (item.polls.get(call) ?? 0) + 1;
               item.polls.set(call, polls);
@@ -368,9 +377,10 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             gl.clearColor(0.1, 0.4, 0.7, 1); gl.clear(gl.COLOR_BUFFER_BIT);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb);
           }
-          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0, mixedMaterials = false, modulatedOpacity = 1, box = null, clipRect = false } = {}) {
+          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0, mixedMaterials = false, modulatedOpacity = 1, box = null, clipRect = false, empty = false } = {}) {
             renderer.bindContext(); renderer.invalidateGLState();
             overlay ? renderer.beginOverlayFrame() : renderer.clear();
+            if (empty) return;
             renderer.setSurfaceMaterial(material, 0, 0, 256, 256, -1);
             renderer.save(); renderer.modulateOpacity(modulatedOpacity);
             if (clipRect) renderer.saveClipRect(0, 0, 256, 256);
@@ -427,7 +437,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             get imageMaterialWrites() { return imageMaterialWrites; },
             attempt, untilDrawn, setGate: (open) => { gate = open; },
             linkPrograms() {
-              phase = "blocking";
+              phase = parallel ? "submit" : "blocking"; ++call;
               renderer.linkDrawPrograms();
             },
             block(options) {
@@ -584,22 +594,43 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           eager.linkPrograms();
           const drawPrograms = eager.programs.filter((program) => program.draw);
           const clipped = drawPrograms.some((program) => hasDefine(program.source, "ENABLE_CLIP_RECT"));
-          assert(drawPrograms.length === (clipped ? 7 : 6) &&
-            drawPrograms.every((program) => program.complete),
-            "linkDrawPrograms did not synchronously finish Magic Garden's programs and supported clip variants.");
+          assert(drawPrograms.length === (clipped ? 7 : 6), "linkDrawPrograms submitted the wrong set.");
           const links = eager.programs.length;
           eager.linkPrograms();
+          if (eager.parallel) {
+            assert(eager.programs.every((program) =>
+              !program.statusReads.some((read) => read.phase === "submit")),
+              "Background submission read LINK_STATUS or COMPLETION_STATUS_KHR.");
+            assert(eager.violations.length === 0, "Background submission queried a pending program.");
+            assert(eager.attempt({ empty: true }) === 0, "Empty frame reported pending programs.");
+            assert(eager.programs.every((program) =>
+              !program.statusReads.some((read) => read.phase === "try")),
+              "Empty frame polled an unused program.");
+            // Without clip planes an outer clip also needs stencil clip reset.
+            const oneProgramFrame = { clipRect: clipped };
+            assert(eager.attempt(oneProgramFrame) > 0, "Closed completion gate did not defer the needed program.");
+            const needed = drawPrograms.filter((program) => program.polls.size > 0);
+            assert(needed.length === 1, "A one-program frame polled unused draw programs.");
+            eager.setGate(true);
+            await eager.untilDrawn(oneProgramFrame);
+            assert(drawPrograms.filter((program) => program !== needed[0]).every((program) =>
+              program.statusReads.length === 0), "Retry polled programs reserved for later frames.");
+          } else {
+            assert(drawPrograms.every((program) => program.complete),
+              "linkDrawPrograms did not finish synchronously without KHR.");
+          }
           for (const options of [{ mix: true, clipRect: true }, { material: 1, mixedMaterials: true, clipRect: true },
             { quad: true, material: 1, box: [0, 0, 128, 128], clipRect: true }]) {
             eagerReference.block(options);
-            assert(eager.attempt(options) === 0, "Prelinked frame reported a pending draw program.");
+            if (eager.parallel) await eager.untilDrawn(options);
+            else assert(eager.attempt(options) === 0, "Synchronous prelink left a pending draw program.");
             assert(countDifferentPixels(eagerReference.pixels(), eager.pixels()) === 0,
               "Prelinked rendering differs from lazy blocking rendering.");
           }
           assert(eager.programs.length === links, "Prelinked draws or a repeated call submitted another link.");
           eager.destroy();
         }
-        eagerReference.destroy(); report.passed.push("synchronous Magic Garden draw-program links with/without KHR");
+        eagerReference.destroy(); report.passed.push("known-program submission, frame-only polling, and synchronous fallback");
 
         document.body.dataset.deferredStep = "feather";
         const feathered = makeTarget();
@@ -1153,7 +1184,7 @@ async function main(wasmFilename) {
         throw new Error(`Magic Garden eager-link check failed:\n${contentResult.stderr}\n${contentResult.stdout}`);
       }
       const content = JSON.parse(await readFile(join(temporaryDirectory, "content-check/pixel-comparison.json"), "utf8"));
-      console.log("Magic Garden eager-link check passed:", wasmFilename,
+      console.log("Magic Garden first-try program check passed:", wasmFilename,
         content.caseCount, "cases; KHR exposed:", content.programs.map((side) => side.parallel),
         "; no further draw-program links.");
     } else {
