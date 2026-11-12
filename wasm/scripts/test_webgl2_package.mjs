@@ -120,7 +120,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         "setSurfaceMaterial",
       ];
       if (!${JSON.stringify(legacyComparison)}) {
-        apiNames.push("bindContext", "tryFlush", "clearRect");
+        apiNames.push("bindContext", "tryFlush", "clearRect", "linkDrawPrograms");
       }
 
       function finish(payload) {
@@ -324,7 +324,9 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
               return ready;
             }
             blocking("getProgramParameter(" + parameter + ")", program);
-            return original(program, parameter);
+            const value = original(program, parameter);
+            if (parameter === gl.LINK_STATUS && phase === "blocking" && item) item.complete ||= value;
+            return value;
           });
           for (const name of ["useProgram", "getUniformLocation", "getUniformBlockIndex"]) {
             wrap(name, (original, program, ...args) => {
@@ -422,6 +424,10 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           return { renderer, gl, programs, parallel, violations, blockedFamilies, seed, pixels, usedPrograms, blitRects,
             get imageMaterialWrites() { return imageMaterialWrites; },
             attempt, untilDrawn, setGate: (open) => { gate = open; },
+            linkPrograms() {
+              phase = "blocking";
+              renderer.linkDrawPrograms();
+            },
             block(options) {
               phase = "blocking"; issued = false;
               ++call; record(options); renderer.flush();
@@ -569,6 +575,26 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         assert(countDifferentPixels(drawn, noParallelBlocking.pixels()) === 0,
           "Blocking path without KHR produced different pixels.");
         noParallelBlocking.destroy(); report.passed.push("blocking link count without KHR");
+
+        const eagerReference = makeTarget();
+        for (const hideParallel of [false, true]) {
+          const eager = makeTarget({ hideParallel });
+          eager.linkPrograms();
+          assert(eager.programs.filter((program) => program.draw).length === 5 &&
+            eager.programs.filter((program) => program.draw).every((program) => program.complete),
+            "linkDrawPrograms did not synchronously finish Magic Garden's five programs.");
+          const links = eager.programs.length;
+          eager.linkPrograms();
+          for (const options of [{ mix: true }, { material: 1, mixedMaterials: true }]) {
+            eagerReference.block(options);
+            assert(eager.attempt(options) === 0, "Prelinked frame reported a pending draw program.");
+            assert(countDifferentPixels(eagerReference.pixels(), eager.pixels()) === 0,
+              "Prelinked rendering differs from lazy blocking rendering.");
+          }
+          assert(eager.programs.length === links, "Prelinked draws or a repeated call submitted another link.");
+          eager.destroy();
+        }
+        eagerReference.destroy(); report.passed.push("synchronous Magic Garden draw-program links with/without KHR");
 
         document.body.dataset.deferredStep = "feather";
         const feathered = makeTarget();
@@ -1110,6 +1136,23 @@ async function main(wasmFilename) {
       console.log("Packed WebGL2 browser test passed:", wasmFilename, result);
     } finally {
       await server.close();
+    }
+    if (process.env.RIVE_TEST_GAME_ROOT) {
+      const installedPackage = join(temporaryDirectory, "node_modules/@magiccircle/rive-webgl2-advanced");
+      await writeFile(join(installedPackage, "glsl.glsl.exports.h"), shaderExports);
+      const contentResult = await run(process.execPath, [
+        join(scriptDirectory, "compare_webgl2_pixels.mjs"), installedPackage, installedPackage,
+        process.env.RIVE_TEST_GAME_ROOT, join(temporaryDirectory, "content-check"),
+      ], { env: { ...process.env, RIVE_TEST_LINK_PROGRAMS: "1", RIVE_TEST_WASM: wasmFilename } });
+      if (contentResult.status !== 0) {
+        throw new Error(`Magic Garden eager-link check failed:\n${contentResult.stderr}\n${contentResult.stdout}`);
+      }
+      const content = JSON.parse(await readFile(join(temporaryDirectory, "content-check/pixel-comparison.json"), "utf8"));
+      console.log("Magic Garden eager-link check passed:", wasmFilename,
+        content.caseCount, "cases; KHR exposed:", content.programs.map((side) => side.parallel),
+        "; no further draw-program links.");
+    } else {
+      console.log("Magic Garden eager-link check skipped: set RIVE_TEST_GAME_ROOT and PLAYWRIGHT_MODULE.");
     }
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });

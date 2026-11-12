@@ -244,6 +244,12 @@ export declare class RendererWrapper {
    */
   tryFlush(): number;
   /**
+   * WebGL2 only. Synchronously links Magic Garden's depth-stencil draw programs.
+   * Call before revealing the loading animation where parallel compilation is
+   * unavailable. Does not draw or consume a recorded frame.
+   */
+  linkDrawPrograms(): void;
+  /**
    * WebGL2 overlay frames only. Records a target rectangle, in saveClipRect
    * coordinates, to clear to transparent before this frame's draws. A frame
    * that tryFlush() does not draw clears nothing. Full-clear frames ignore it.

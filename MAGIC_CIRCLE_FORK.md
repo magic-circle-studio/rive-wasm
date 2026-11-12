@@ -29,6 +29,11 @@ The fork adds:
   fragment uniforms without adding vertex data; plain meshes upload no material
   uniforms except a mode reset after a materialized mesh.
 
+`linkDrawPrograms()` synchronously links Magic Garden's depth-stencil draw
+programs before revealing the loading animation on contexts without parallel
+shader compilation. It also works synchronously with the extension present;
+renderers that do not call it retain lazy linking through `tryFlush()`/`flush()`.
+
 `2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
 decoding before invoking `decodeImage`'s callback, reports invalid images as
 `null`, and releases Blob URLs and native decode references on failure.
@@ -89,6 +94,12 @@ image-quad update bounds.
 Set `CHROME_BIN` if Chrome is not on PATH.
 Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 `RIVE_TEST_WASM` optionally restricts the binary under test.
+Set `RIVE_TEST_GAME_ROOT` to the Magic Circle game checkout and
+`PLAYWRIGHT_MODULE` to an installed Playwright module to include the 209-case
+content check on the packed package. It calls `linkDrawPrograms()` immediately
+after creation, requires all five programs to be linked, and rejects further
+draw-program links with parallel compilation available and hidden. It uses the
+host GPU; changes to shipped content that need another program fail this check.
 
 `wasm/scripts/compare_webgl2_pixels.mjs` compares two staged packages with
 ubershader rendering, using host-GPU ANGLE GL. It samples all 32 pets

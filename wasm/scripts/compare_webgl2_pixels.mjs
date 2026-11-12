@@ -12,6 +12,9 @@ const [baselineArg, candidateArg, assetsArg, outputArg] = process.argv.slice(2);
 if (!outputArg) throw new Error("Usage: compare_webgl2_pixels.mjs baseline-package candidate-package game-root output-directory");
 const baseline = resolve(baselineArg), candidate = resolve(candidateArg);
 const assets = resolve(assetsArg), output = resolve(outputArg);
+// The package test uses both sides to check eager linking with KHR present/hidden.
+const checkLinkedPrograms = process.env.RIVE_TEST_LINK_PROGRAMS === "1";
+const wasmFilename = process.env.RIVE_TEST_WASM ?? "rive.wasm";
 await mkdir(output, { recursive: true });
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? "playwright");
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -20,7 +23,7 @@ for (const directory of [baseline, candidate]) {
   const header = await readFile(join(directory === baseline ? directory : join(root,
     "wasm/build/webgl2_advanced/bin/release/include/generated/shaders"), "glsl.glsl.exports.h"), "utf8");
   packages.push({ version: JSON.parse(await readFile(join(directory, "package.json"))).version,
-    wasmSha256: hash(await readFile(join(directory, "rive.wasm"))),
+    wasmSha256: hash(await readFile(join(directory, wasmFilename))),
     macros: Object.fromEntries(Object.entries(parseShaderMacros(header)).map(([name, alias]) => [alias, name])) });
 }
 const petsPath = "client/raw-assets/rive/pets{m}";
@@ -89,7 +92,7 @@ try {
   const page = await browser.newPage();
   page.on("console", (message) => { if (message.type() === "error") console.error(message.text()); });
   await page.goto(`http://127.0.0.1:${server.address().port}`);
-  const result = await page.evaluate(async ({ packages, cases, images }) => {
+  const result = await page.evaluate(async ({ packages, cases, images, checkLinkedPrograms, wasmFilename }) => {
     const { pathFixture } = await import("/webgl2_test_support.mjs");
     const sides = [];
     const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -100,15 +103,20 @@ try {
     const png = new Uint8Array(await (await imageCanvas.convertToBlob()).arrayBuffer());
     for (const [index, prefix] of ["baseline", "candidate"].entries()) {
       const { default: init } = await import("/" + prefix + "/webgl2_advanced.mjs");
-      const rive = await init({ locateFile: () => "/" + prefix + "/rive.wasm" });
+      const rive = await init({ locateFile: () => "/" + prefix + "/" + wasmFilename });
       const canvas = document.createElement("canvas"); canvas.width = canvas.height = 512;
       const gl = canvas.getContext("webgl2", { antialias: false, depth: false, stencil: false,
         premultipliedAlpha: true, preserveDrawingBuffer: true });
       const gpu = gl.getParameter(gl.getExtension("WEBGL_debug_renderer_info").UNMASKED_RENDERER_WEBGL);
       assert(!/swiftshader|llvmpipe|software/i.test(gpu), "Host GPU required: " + gpu);
+      if (checkLinkedPrograms && index === 1) {
+        const getExtension = gl.getExtension.bind(gl);
+        gl.getExtension = (name) => name === "KHR_parallel_shader_compile" ? null : getExtension(name);
+      }
+      const parallel = !!gl.getExtension("KHR_parallel_shader_compile");
       const sources = new Map(), attached = new Map(), programs = [], records = new Map();
       const meshDraws = {};
-      let current = null, active = null;
+      let current = null, active = null, linksComplete = false;
       const originalSource = gl.shaderSource.bind(gl), originalAttach = gl.attachShader.bind(gl), originalLink = gl.linkProgram.bind(gl);
       gl.shaderSource = (shader, source) => { sources.set(shader, source); originalSource(shader, source); };
       gl.attachShader = (program, shader) => {
@@ -123,10 +131,18 @@ try {
             ([, name]) => packages[index].macros[name] ?? (name === glslMarker ? "GLSL" : name));
         }))].sort();
         const type = defines.includes("DRAW_IMAGE_MESH") ? "imageMesh" : defines.includes("DRAW_PATH") ? "path"
-          : defines.includes("DRAW_INTERIOR_TRIANGLES") ? "interiorTriangles" : defines.includes("FEATHER_ATLAS_BLIT") ? "featherAtlasBlit" : "aux";
+          : defines.includes("DRAW_INTERIOR_TRIANGLES") ? "interiorTriangles" : defines.includes("FEATHER_ATLAS_BLIT") ? "featherAtlasBlit"
+          : defines.includes("RENDER_MODE_DEPTH_STENCIL") ? "clipReset" : "aux";
+        assert(!linksComplete || type === "aux", "Draw-program link after linkDrawPrograms: " + current + " " + defines.join(","));
         const record = { type, defines,  firstCase: current, usedCases: {} };
         programs.push(record); records.set(program, record);
         originalLink(program);
+      };
+      const originalParameter = gl.getProgramParameter.bind(gl);
+      gl.getProgramParameter = (program, name) => {
+        const value = originalParameter(program, name);
+        if (name === gl.LINK_STATUS && records.has(program)) records.get(program).linked = value;
+        return value;
       };
       const originalUse = gl.useProgram.bind(gl);
       gl.useProgram = (program) => { active = records.get(program); originalUse(program); };
@@ -139,6 +155,14 @@ try {
         };
       }
       const renderer = rive.makeRenderer(canvas); renderer.setExactProgramsEnabled?.(false);
+      if (checkLinkedPrograms) {
+        renderer.linkDrawPrograms();
+        const drawPrograms = programs.filter((program) => program.type !== "aux");
+        assert(drawPrograms.length === 5 && drawPrograms.every((program) => program.linked),
+          "linkDrawPrograms must finish all five draw programs synchronously");
+        linksComplete = true;
+        renderer.linkDrawPrograms(); // Repeated calls are cache hits.
+      }
       renderer.bindContext();
       const target = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, target);
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, 512, 512);
@@ -162,7 +186,7 @@ try {
         bindings[name] = renderer.makeImageFromGLTexture(texture, bitmap.width, bitmap.height);
         bitmap.close();
       }
-      sides.push({ rive, renderer, gl, gpu, programs, bindings, framebuffer, meshDraws, setCurrent: (name) => { current = name; } });
+      sides.push({ rive, renderer, gl, gpu, parallel, programs, bindings, framebuffer, meshDraws, setCurrent: (name) => { current = name; } });
     }
     const digest = async (pixels) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", pixels)),
       (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -265,10 +289,10 @@ try {
       assert(cases.find((spec) => spec.name === name).material !== 0,
         "A plain scene used a material path program: " + name);
     }
-    const programs = sides.map((side) => ({ gpu: side.gpu, meshDraws: side.meshDraws, programs: side.programs.filter((program) => program.type !== "aux") }));
+    const programs = sides.map((side) => ({ gpu: side.gpu, parallel: side.parallel, meshDraws: side.meshDraws, programs: side.programs.filter((program) => program.type !== "aux") }));
     for (const side of sides) { side.renderer.bindContext(); for (const image of Object.values(side.bindings)) image.unref(); side.renderer.delete(); }
     return { rows, programs };
-  }, { packages, cases, images });
+  }, { packages, cases, images, checkLinkedPrograms, wasmFilename });
   result.packages = packages.map(({ macros, ...metadata }) => metadata);
   result.manifest = manifest;
   result.caseCount = cases.length;

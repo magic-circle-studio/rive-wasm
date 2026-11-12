@@ -673,6 +673,12 @@ public:
 
     size_t tryFlush() { return flushFrame(true); }
 
+    void linkDrawPrograms()
+    {
+        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+        renderContextGL()->linkDrawPrograms();
+    }
+
 private:
     size_t flushFrame(bool tryPrograms)
     {
@@ -1379,6 +1385,7 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
         .function("clear", &WebGL2Renderer::clear)
         .function("flush", &WebGL2Renderer::flush)
         .function("tryFlush", &WebGL2Renderer::tryFlush)
+        .function("linkDrawPrograms", &WebGL2Renderer::linkDrawPrograms)
         .function("clearRect", &WebGL2Renderer::clearRect)
         .function("resize", &WebGL2Renderer::resize)
         .function("saveClipRect", &WebGL2Renderer::saveClipRect)
