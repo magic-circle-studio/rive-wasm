@@ -25,9 +25,10 @@ The fork adds:
   the target mid-frame, so neither guarantee holds for that frame; and
 - an ubershader-only WebGL2 renderer, cached image quads in depth-stencil mode,
   and per-draw opt-in clip-rect, material/HSL and image-paint features. Plain and
-  material paths use separate batches. Image meshes switch materials through
-  fragment uniforms without adding vertex data; plain meshes upload no material
-  uniforms except a mode reset after a materialized mesh.
+  material paths use separate batches. Plain srcOver and material meshes use
+  separate programs. Mesh materials use fragment uniforms without adding vertex
+  data. Plain meshes upload no material uniforms except a mode reset if a mesh
+  with an HSL blend mode shares a program last used by a materialized mesh.
 
 `linkDrawPrograms()` synchronously links Magic Garden's depth-stencil draw
 programs before revealing the loading animation on contexts without parallel
@@ -97,9 +98,9 @@ Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 Set `RIVE_TEST_GAME_ROOT` to the Magic Circle game checkout and
 `PLAYWRIGHT_MODULE` to an installed Playwright module to include the 209-case
 content check on the packed package. It calls `linkDrawPrograms()` immediately
-after creation, requires six programs plus five clip-rect variants where clip
-planes are supported to be linked, and rejects further
-draw-program links with parallel compilation available and hidden. It uses the
+after creation, requires seven programs (six without clip-plane support) to be
+linked, and rejects further draw-program links with parallel compilation
+available and hidden. It uses the
 host GPU; changes to shipped content that need another program fail this check.
 
 `wasm/scripts/compare_webgl2_pixels.mjs` compares two staged packages with

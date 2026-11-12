@@ -159,8 +159,8 @@ try {
         renderer.linkDrawPrograms();
         const drawPrograms = programs.filter((program) => program.type !== "aux");
         const clipped = drawPrograms.some((program) => program.defines.includes("ENABLE_CLIP_RECT"));
-        assert(drawPrograms.length === (clipped ? 11 : 6) && drawPrograms.every((program) => program.linked),
-          "linkDrawPrograms must finish six draw programs plus five supported clip-rect variants synchronously");
+        assert(drawPrograms.length === (clipped ? 7 : 6) && drawPrograms.every((program) => program.linked),
+          "linkDrawPrograms must finish seven draw programs (six without clip planes) synchronously");
         linksComplete = true;
         renderer.linkDrawPrograms(); // Repeated calls are cache hits.
       }

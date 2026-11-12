@@ -368,11 +368,12 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
             gl.clearColor(0.1, 0.4, 0.7, 1); gl.clear(gl.COLOR_BUFFER_BIT);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb);
           }
-          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0, mixedMaterials = false, modulatedOpacity = 1, box = null } = {}) {
+          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0, mixedMaterials = false, modulatedOpacity = 1, box = null, clipRect = false } = {}) {
             renderer.bindContext(); renderer.invalidateGLState();
             overlay ? renderer.beginOverlayFrame() : renderer.clear();
             renderer.setSurfaceMaterial(material, 0, 0, 256, 256, -1);
             renderer.save(); renderer.modulateOpacity(modulatedOpacity);
+            if (clipRect) renderer.saveClipRect(0, 0, 256, 256);
             usedPrograms.length = 0;
             if (overlay && clear) renderer.clearRect(12, 36, 92, 100);
             if (mix) {
@@ -405,6 +406,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
                 renderer.restore();
               }
             }
+            if (clipRect) renderer.restoreClipRect();
             renderer.restore();
           }
           function attempt(options) {
@@ -582,13 +584,13 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           eager.linkPrograms();
           const drawPrograms = eager.programs.filter((program) => program.draw);
           const clipped = drawPrograms.some((program) => hasDefine(program.source, "ENABLE_CLIP_RECT"));
-          assert(drawPrograms.length === (clipped ? 11 : 6) &&
+          assert(drawPrograms.length === (clipped ? 7 : 6) &&
             drawPrograms.every((program) => program.complete),
             "linkDrawPrograms did not synchronously finish Magic Garden's programs and supported clip variants.");
           const links = eager.programs.length;
           eager.linkPrograms();
-          for (const options of [{ mix: true }, { material: 1, mixedMaterials: true },
-            { quad: true, material: 1, box: [0, 0, 128, 128] }]) {
+          for (const options of [{ mix: true, clipRect: true }, { material: 1, mixedMaterials: true, clipRect: true },
+            { quad: true, material: 1, box: [0, 0, 128, 128], clipRect: true }]) {
             eagerReference.block(options);
             assert(eager.attempt(options) === 0, "Prelinked frame reported a pending draw program.");
             assert(countDifferentPixels(eagerReference.pixels(), eager.pixels()) === 0,
