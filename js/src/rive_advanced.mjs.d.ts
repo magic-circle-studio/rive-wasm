@@ -214,6 +214,8 @@ export declare class RendererWrapper {
    */
   restore(): void;
   transform(tranform: Mat2D): void;
+  /** Multiplies opacity for subsequent draws within the saved state. */
+  modulateOpacity(opacity: number): void;
   drawPath(path: RenderPath, paint: RenderPaint): void;
   clipPath(path: RenderPath): void;
   /**
@@ -233,6 +235,27 @@ export declare class RendererWrapper {
   clear(): void;
   delete(): void;
   flush(): void;
+  /**
+   * Draws the recorded WebGL2 frame only if every program it needs has finished
+   * linking. Otherwise draws nothing, leaves the target untouched, starts the
+   * missing links in the background, and returns how many programs are pending.
+   * Returns 0 when drawn. Either way the recorded frame is consumed, as with
+   * flush(). Without KHR_parallel_shader_compile this is flush() and returns 0.
+   */
+  tryFlush(): number;
+  /**
+   * WebGL2 only. Starts Magic Garden's depth-stencil draw-program links in the
+   * background with KHR_parallel_shader_compile, without reading link status.
+   * Without the extension, links synchronously. Does not draw or consume a frame.
+   * tryFlush() polls and finishes only the programs its recorded frame needs.
+   */
+  linkDrawPrograms(): void;
+  /**
+   * WebGL2 overlay frames only. Records a target rectangle, in saveClipRect
+   * coordinates, to clear to transparent before this frame's draws. A frame
+   * that tryFlush() does not draw clears nothing. Full-clear frames ignore it.
+   */
+  clearRect(left: number, top: number, right: number, bottom: number): void;
   /**
    * Re-binds Rive's internal textures and invalidates the GL state
    * cache. Call before Rive renders when another renderer (e.g.

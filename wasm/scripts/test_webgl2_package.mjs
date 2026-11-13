@@ -1,9 +1,10 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { findChrome, parseShaderMacros } from "./webgl2_test_support.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, "../..");
@@ -17,6 +18,9 @@ const imageBindingFixturePath = join(
   repositoryRoot,
   "wasm/submodules/rive-runtime/tests/unit_tests/assets/data_binding_images_test.riv",
 );
+const shaderExports = await readFile(join(repositoryRoot,
+  "wasm/build/webgl2_advanced/bin/release/include/generated/shaders/glsl.glsl.exports.h"), "utf8");
+const shaderMacros = parseShaderMacros(shaderExports);
 const resultMarker = "RIVE_PACKAGE_TEST_RESULT";
 const legacyComparison = process.env.RIVE_TEST_LEGACY === "1";
 const artboardName = process.env.RIVE_TEST_ARTBOARD ?? null;
@@ -28,23 +32,6 @@ const mimeTypes = new Map([
   [".riv", "application/octet-stream"],
   [".wasm", "application/wasm"],
 ]);
-
-/** Finds a Chrome-compatible browser for the real-WebGL package test. */
-function findBrowser() {
-  const candidates = [
-    process.env.CHROME_BIN,
-    "google-chrome",
-    "chromium",
-    "chromium-browser",
-  ].filter(Boolean);
-  for (const candidate of candidates) {
-    const result = spawnSync("which", [candidate], { encoding: "utf8" });
-    if (result.status === 0) {
-      return result.stdout.trim();
-    }
-  }
-  throw new Error("Chrome was not found. Set CHROME_BIN to its executable.");
-}
 
 /** Runs a child process and returns its captured output. */
 function run(command, args, options = {}) {
@@ -75,6 +62,11 @@ async function startServer(rootDirectory) {
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", "http://localhost");
+      if (url.pathname === "/next-frame") {
+        // Yield real time to the driver even when Chrome advances virtual time.
+        setTimeout(() => response.writeHead(204).end(), 16);
+        return;
+      }
       const relativePath = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
       const path = resolve(rootDirectory, relativePath);
       if (path !== rootDirectory && !path.startsWith(`${rootDirectory}/`)) {
@@ -108,6 +100,13 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
     <pre id="result">pending</pre>
     <canvas id="canvas" width="256" height="256"></canvas>
     <script type="module">
+      import { pathFixture } from "/webgl2_test_support.mjs";
+      if (${JSON.stringify(process.env.RIVE_TEST_HIDE_PARALLEL === "1")}) {
+        const getExtension = WebGL2RenderingContext.prototype.getExtension;
+        WebGL2RenderingContext.prototype.getExtension = function(name) {
+          return name === "KHR_parallel_shader_compile" ? null : getExtension.call(this, name);
+        };
+      }
       const result = document.querySelector("#result");
       const browserMessages = [];
       for (const method of ["error", "warn"]) {
@@ -126,7 +125,9 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         "makeImageFromGLTexture",
         "setSurfaceMaterial",
       ];
-      if (!${JSON.stringify(legacyComparison)}) apiNames.push("bindContext");
+      if (!${JSON.stringify(legacyComparison)}) {
+        apiNames.push("bindContext", "tryFlush", "clearRect", "linkDrawPrograms");
+      }
 
       function finish(payload) {
         result.textContent = ${JSON.stringify(resultMarker)} + JSON.stringify(payload);
@@ -200,6 +201,543 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           }
         }
         return differentPixels;
+      }
+
+      // Write tiny, deterministic RIVE v7 fixtures using generated core keys.
+      // This keeps normal, screen, and feather paths independent of art assets.
+      async function testDeferredFlush(rive, png) {
+        const macros = ${JSON.stringify(shaderMacros)};
+        const report = { passed: [], parallel: false };
+        // dump-dom's virtual clock can withhold rAF on an idle page. Keep a
+        // timer watchdog so the same retry checks also complete in CI.
+        report.animationFrames = 0;
+        report.timerRetries = 0;
+        const nextFrame = async () => {
+          await fetch("/next-frame");
+          return new Promise((resolve) => {
+            const frame = requestAnimationFrame(() => {
+              clearTimeout(timer); ++report.animationFrames; resolve();
+            });
+            const timer = setTimeout(() => {
+              cancelAnimationFrame(frame); ++report.timerRetries; resolve();
+            }, 25);
+          });
+        };
+        const files = [];
+        const boards = [];
+        const cleanups = [];
+        async function boardFor(bytes) {
+          const file = await rive.load(bytes);
+          assert(file, "Deferred fixture failed to load.");
+          // In-band images decode after import; make the mesh drawable before
+          // measuring its first shader link.
+          await Promise.all(Array.from(rive.images?.values() ?? [], (image) => image.decodePromise));
+          const board = file.defaultArtboard();
+          assert(board, "Deferred fixture has no artboard.");
+          board.advance(0);
+          files.push(file); boards.push(board);
+          return board;
+        }
+        const normal = await boardFor(pathFixture());
+        // Artboard stencil clips otherwise prevent merging on hosts without clip planes.
+        const batchPaths = await boardFor(pathFixture({ clip: false }));
+        const screen = await boardFor(pathFixture({ screen: true }));
+        const feather = await boardFor(pathFixture({ feather: true }));
+        const mesh = await boardFor(pathFixture({ meshPNG: png }));
+        const imageQuad = await boardFor(pathFixture({ imagePNG: png }));
+        const imageMeshQuad = await boardFor(pathFixture({ meshPNG: png, unitMesh: true }));
+        const paintedQuad = await boardFor(pathFixture({ imagePNG: png, pathReference: true }));
+
+        function hasDefine(source, name) {
+          return source.includes("#define " + macros[name] + " true\n");
+        }
+        function makeTarget({ hideParallel = false } = {}) {
+          const canvas = document.createElement("canvas");
+          canvas.width = canvas.height = 256;
+          const gl = canvas.getContext("webgl2", {
+            alpha: true, depth: true, stencil: true, antialias: true,
+            premultipliedAlpha: true, preserveDrawingBuffer: true,
+          });
+          assert(gl, "Deferred test has no WebGL2 context.");
+          const extension = gl.getExtension("KHR_parallel_shader_compile");
+          const parallel = !!extension && !hideParallel;
+          report.parallel ||= parallel;
+          const programs = [];
+          const sources = new Map();
+          const attached = new Map();
+          const violations = [];
+          let call = 0;
+          let phase = "constructor";
+          let issued = false;
+          let gate = false;
+          let activeProgram = null;
+          const usedPrograms = [];
+          const blitRects = [];
+          const imageMaterialLocations = new Set();
+          let imageMaterialWrites = 0;
+          const blockedFamilies = new Set();
+          const methods = {};
+          function wrap(name, fn) {
+            methods[name] = gl[name];
+            gl[name] = function(...args) { return fn(methods[name].bind(this), ...args); };
+          }
+          wrap("getExtension", (original, name) =>
+            hideParallel && name === "KHR_parallel_shader_compile" ? null : original(name));
+          wrap("shaderSource", (original, shader, source) => {
+            sources.set(shader, source); return original(shader, source);
+          });
+          wrap("attachShader", (original, program, shader) => {
+            if (!attached.has(program)) attached.set(program, []);
+            attached.get(program).push(shader); return original(program, shader);
+          });
+          for (const name of ["clear", "drawArrays", "drawElements", "drawArraysInstanced", "drawElementsInstanced", "blitFramebuffer"]) {
+            wrap(name, (original, ...args) => {
+              if (name.startsWith("draw") && activeProgram?.draw) usedPrograms.push(activeProgram);
+              if (name === "blitFramebuffer") blitRects.push(args.slice(0, 4));
+              issued = true; return original(...args);
+            });
+          }
+          wrap("linkProgram", (original, program) => {
+            assert(!parallel || phase !== "try" || !issued,
+              "Issue pass submitted a program link.");
+            const shaders = attached.get(program).map((shader) => sources.get(shader));
+            const source = shaders.join("\n");
+            const fragment = shaders.find((source) =>
+              source.includes("#define " + macros.FRAGMENT + "\n")) ?? "";
+            const draw = programs.length >= 3;
+            const atlas = hasDefine(source, "ATLAS_FEATHERED_FILL") || hasDefine(source, "ATLAS_FEATHERED_STROKE");
+            const family = programs.length === 2 ? "blit" : atlas ? (hasDefine(source, "ATLAS_FEATHERED_STROKE") ? "featherStroke" : "feather") : hasDefine(source, "DRAW_IMAGE_MESH") ? "image"
+              : hasDefine(fragment, "ENABLE_ADVANCED_BLEND") || hasDefine(fragment, "ENABLE_KHR_BLEND") ? "screen" : "normal";
+            programs.push({ program, source, family, draw: draw && !atlas, atlas,
+              excluded: programs.length < 2, complete: false, polls: new Map(), statusReads: [], phase });
+            return original(program);
+          });
+          const info = (program) => programs.find((item) => item.program === program);
+          function blocking(name, program) {
+            const item = info(program);
+            if (parallel && phase !== "blocking" && item && !item.excluded && !item.complete) {
+              violations.push(name + " before completion: " + item.family);
+            }
+          }
+          wrap("getProgramParameter", (original, program, parameter) => {
+            assert(!parallel || phase !== "try" || !issued, "Issue pass queried a program.");
+            const item = info(program);
+            if (parameter === gl.LINK_STATUS || parameter === extension?.COMPLETION_STATUS_KHR) {
+              item?.statusReads.push({ parameter, phase });
+            }
+            if (parameter === extension?.COMPLETION_STATUS_KHR) {
+              const polls = (item.polls.get(call) ?? 0) + 1;
+              item.polls.set(call, polls);
+              assert(phase !== "try" || polls <= 1, "Program polled more than once in one tryFlush().");
+              const ready = original(program, parameter);
+              if (!gate || blockedFamilies.has(item.family)) return false;
+              item.complete ||= ready;
+              return ready;
+            }
+            blocking("getProgramParameter(" + parameter + ")", program);
+            const value = original(program, parameter);
+            if (parameter === gl.LINK_STATUS && phase === "blocking" && item) item.complete ||= value;
+            return value;
+          });
+          for (const name of ["useProgram", "getUniformLocation", "getUniformBlockIndex"]) {
+            wrap(name, (original, program, ...args) => {
+              assert(!parallel || name === "useProgram" || phase !== "try" || !issued,
+                "Issue pass queried a uniform.");
+              blocking(name, program);
+              const result = original(program, ...args);
+              if (name === "useProgram") activeProgram = info(program);
+              if (name === "getUniformLocation" &&
+                [macros.imageSurfaceMaterialMatrix, macros.imageSurfaceMaterialTranslate].includes(args[0])) {
+                imageMaterialLocations.add(result);
+              }
+              return result;
+            });
+          }
+          for (const name of ["uniform4f", "uniform4fv"]) {
+            wrap(name, (original, location, ...args) => {
+              if (imageMaterialLocations.has(location)) imageMaterialWrites++;
+              return original(location, ...args);
+            });
+          }
+          const renderer = rive.makeRenderer(canvas);
+          assert(renderer, "Deferred renderer creation failed.");
+          assert(programs.length === 3, "Expected color ramp, tessellation, and prelinked blit at creation.");
+          renderer.bindContext();
+          const target = makeTexture(gl, 256, 256);
+          renderer.setTargetTexture(target, 256, 256);
+          const pixels = () => {
+            renderer.bindContext(); renderer.unbindGLInternalResources();
+            return readTexturePixels(gl, target, 256, 256);
+          };
+          function seed() {
+            phase = "seed"; issued = false;
+            renderer.bindContext(); renderer.unbindGLInternalResources();
+            const fb = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target, 0);
+            gl.disable(gl.SCISSOR_TEST); gl.colorMask(true, true, true, true);
+            gl.clearColor(0.1, 0.4, 0.7, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb);
+          }
+          function record({ mix = false, overlay = false, feathered = false, clear = true, quad = false, meshQuad = false, paintQuad = false, material = 0, mixedMaterials = false, modulatedOpacity = 1, box = null, clipRect = false, empty = false } = {}) {
+            renderer.bindContext(); renderer.invalidateGLState();
+            overlay ? renderer.beginOverlayFrame() : renderer.clear();
+            if (empty) return;
+            renderer.setSurfaceMaterial(material, 0, 0, 256, 256, -1);
+            renderer.save(); renderer.modulateOpacity(modulatedOpacity);
+            if (clipRect) renderer.saveClipRect(0, 0, 256, 256);
+            usedPrograms.length = 0;
+            if (overlay && clear) renderer.clearRect(12, 36, 92, 100);
+            if (mix) {
+              screen.draw(renderer);
+              renderer.save(); renderer.align(rive.Fit.fill, rive.Alignment.center,
+                { minX: 80, minY: 0, maxX: 336, maxY: 256 }, normal.bounds);
+              normal.draw(renderer); renderer.restore();
+              mesh.draw(renderer);
+            } else if (feathered) {
+              renderer.save();
+              renderer.align(rive.Fit.contain, rive.Alignment.center,
+                { minX: 0, minY: 0, maxX: 256, maxY: 256 }, feather.bounds);
+              feather.draw(renderer); renderer.restore();
+            } else {
+              const board = mixedMaterials ? batchPaths : quad ? imageQuad : meshQuad ? imageMeshQuad : paintQuad ? paintedQuad : normal;
+              if (box) {
+                renderer.saveClipRect(...box);
+                renderer.align(rive.Fit.fill, rive.Alignment.center,
+                  { minX: box[0], minY: box[1], maxX: box[2], maxY: box[3] }, board.bounds);
+              }
+              board.draw(renderer);
+              if (box) renderer.restoreClipRect();
+              if (mixedMaterials) {
+                renderer.save();
+                const offset = new rive.Mat2D();
+                offset.tx = 80;
+                renderer.transform(offset); offset.delete();
+                renderer.setSurfaceMaterial(1, 0, 0, 256, 256, -1);
+                batchPaths.draw(renderer);
+                renderer.restore();
+              }
+            }
+            if (clipRect) renderer.restoreClipRect();
+            renderer.restore();
+          }
+          function attempt(options) {
+            phase = "try"; issued = false; ++call; record(options);
+            const pending = renderer.tryFlush();
+            assert(violations.length === 0, "Blocking link queries: " + violations.join(", "));
+            return pending;
+          }
+          async function untilDrawn(options) {
+            document.body.dataset.deferredStep += ".retry";
+            for (let frame = 0; frame < 180; frame++) {
+              await nextFrame();
+              if (attempt(options) === 0) return;
+            }
+            throw new Error("tryFlush() did not finish linking within 180 animation frames.");
+          }
+          return { renderer, gl, programs, parallel, violations, blockedFamilies, seed, pixels, usedPrograms, blitRects,
+            get imageMaterialWrites() { return imageMaterialWrites; },
+            attempt, untilDrawn, setGate: (open) => { gate = open; },
+            linkPrograms() {
+              phase = parallel ? "submit" : "blocking"; ++call;
+              renderer.linkDrawPrograms();
+            },
+            block(options) {
+              phase = "blocking"; issued = false;
+              ++call; record(options); renderer.flush();
+            },
+            destroy() {
+              // File images retain textures from their last draw context.
+              // Release the fixtures before deleting those contexts.
+              cleanups.push(() => {
+                renderer.bindContext(); renderer.delete();
+                gl.deleteTexture(target);
+                for (const [name, method] of Object.entries(methods)) gl[name] = method;
+                gl.getExtension("WEBGL_lose_context")?.loseContext();
+              });
+            },
+          };
+        }
+
+        document.body.dataset.deferredStep = "deferred";
+        const deferred = makeTarget();
+        deferred.seed();
+        const before = deferred.pixels();
+        const first = deferred.attempt();
+        assert(deferred.parallel ? first > 0 : first === 0,
+          "Fresh tryFlush() did not report pending or the documented fallback.");
+        if (deferred.parallel) {
+          assert(countDifferentPixels(before, deferred.pixels()) === 0, "Pending path frame changed the target.");
+          deferred.setGate(true); await deferred.untilDrawn();
+        }
+        const drawn = deferred.pixels();
+        assert(countOpaquePixels(drawn) > 0, "Deferred path drew no pixels.");
+        document.body.dataset.deferredStep = "blocking";
+        const blocking = makeTarget();
+        blocking.block();
+        assert(countDifferentPixels(drawn, blocking.pixels()) === 0, "Deferred pixels differ from blocking flush().");
+        report.passed.push("path retry and pixels", "completion gates and once-per-call polls");
+        blocking.destroy(); deferred.destroy();
+
+        const pendingBlock = makeTarget();
+        const blocked = pendingBlock.attempt();
+        const queuedPrograms = pendingBlock.programs.filter((program) => program.draw).length;
+        if (pendingBlock.parallel) assert(blocked > 0, "Pending blocking-reuse fixture drew too soon.");
+        pendingBlock.block();
+        assert(pendingBlock.programs.filter((program) => program.draw).length === queuedPrograms,
+          "Blocking flush created a duplicate pending program.");
+        assert(countDifferentPixels(drawn, pendingBlock.pixels()) === 0,
+          "Blocking flush did not finish the already-pending program.");
+        pendingBlock.destroy(); report.passed.push("blocking reuse of pending ubershader");
+
+        document.body.dataset.deferredStep = "mixed";
+        const mixed = makeTarget();
+        mixed.seed(); const mixedBefore = mixed.pixels();
+        const mixedOptions = { mix: true };
+        const mixedPending = mixed.attempt(mixedOptions);
+        if (mixed.parallel) {
+          assert(mixedPending >= 3, "Mixed frame did not report all three shader families pending.");
+          for (const family of ["normal", "screen", "image"]) {
+            assert(mixed.programs.some((program) => program.draw && program.family === family),
+              "Mixed frame did not link the " + family + " ubershader: " + JSON.stringify(mixed.programs.map(({family, draw, atlas}) => ({family, draw, atlas}))));
+            mixed.blockedFamilies.add(family);
+          }
+          mixed.setGate(true);
+          for (const family of ["normal", "screen", "image"]) {
+            await nextFrame();
+            assert(mixed.attempt(mixedOptions) > 0, "Mixed frame drew with a family still pending.");
+            assert(countDifferentPixels(mixedBefore, mixed.pixels()) === 0, "Pending mixed frame changed pixels.");
+            mixed.blockedFamilies.delete(family);
+          }
+          await mixed.untilDrawn(mixedOptions);
+        } else assert(mixedPending === 0, "Mixed fallback did not draw immediately.");
+        report.passed.push("mixed families and pending gates");
+        mixed.destroy();
+
+        document.body.dataset.deferredStep = "overlay";
+        const overlay = makeTarget();
+        overlay.seed(); const overlayBefore = overlay.pixels();
+        const overlayOptions = { overlay: true };
+        const overlayPending = overlay.attempt(overlayOptions);
+        if (overlay.parallel) {
+          assert(overlayPending >= 2, "Cold overlay did not count both path and blit programs.");
+          assert(countDifferentPixels(overlayBefore, overlay.pixels()) === 0, "Pending overlay cleared the target.");
+          overlay.blockedFamilies.add("blit"); overlay.setGate(true);
+          let onlyBlitPending = false;
+          for (let frame = 0; frame < 180; frame++) {
+            await nextFrame();
+            const pending = overlay.attempt(overlayOptions);
+            assert(pending > 0, "Overlay drew before its blit finished.");
+            assert(countDifferentPixels(overlayBefore, overlay.pixels()) === 0, "Pending blit changed overlay pixels.");
+            if (overlay.programs.filter((program) => program.draw).every((program) => program.complete)) {
+              assert(pending === 1, "Ready paths should wait on exactly the blit program.");
+              onlyBlitPending = true; break;
+            }
+          }
+          assert(onlyBlitPending, "Overlay path programs did not become ready.");
+          overlay.blockedFamilies.delete("blit");
+          await overlay.untilDrawn(overlayOptions);
+        } else assert(overlayPending === 0, "Overlay fallback was not immediate.");
+        const overlayPixels = overlay.pixels();
+        const pixel = (pixels, x, y) => Array.from(pixels.slice(((255 - y) * 256 + x) * 4, ((255 - y) * 256 + x) * 4 + 4));
+        assert(pixel(overlayPixels, 16, 40)[3] === 0, "Overlay clear rectangle has the wrong position/orientation.");
+        assert(pixel(overlayPixels, 48, 64)[3] > 0, "Overlay did not redraw the path.");
+        for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+          if (x >= 12 && x < 92 && y >= 36 && y < 100) continue;
+          assert(pixel(overlayPixels, x, y).every((value, channel) =>
+            value === pixel(overlayBefore, x, y)[channel]), "Overlay changed pixels outside clearRect.");
+        }
+        assert(overlay.programs.filter((program) => !program.draw && !program.atlas).length === 3,
+          "Overlay linked an auxiliary blit program at draw time.");
+        overlay.seed();
+        overlay.block({ overlay: true, clear: false });
+        assert(pixel(overlay.pixels(), 16, 40)[3] === 255, "clearRect leaked into the next frame.");
+        overlay.block(overlayOptions);
+        assert(countDifferentPixels(overlayPixels, overlay.pixels()) === 0,
+          "Blocking flush did not honor clearRect.");
+        report.passed.push("overlay atomic clear, preservation, and orientation");
+        overlay.destroy();
+
+        const discarded = makeTarget();
+        discarded.seed();
+        const discardPending = discarded.attempt({ overlay: true });
+        if (discarded.parallel) {
+          assert(discardPending > 0, "Discard fixture drew too soon.");
+          discarded.setGate(true);
+          await discarded.untilDrawn({ overlay: true, clear: false });
+          assert(pixel(discarded.pixels(), 16, 40)[3] === 255,
+            "A skipped frame's clearRect leaked into the retry.");
+        } else assert(discardPending === 0, "Discard fixture fallback did not draw.");
+        discarded.destroy(); report.passed.push("skipped-frame rectangle consumption");
+
+        document.body.dataset.deferredStep = "noParallel";
+        const noParallel = makeTarget({ hideParallel: true });
+        noParallel.seed(); const noParallelBefore = noParallel.pixels();
+        assert(noParallel.attempt() === 0, "Missing-extension fallback did not return 0.");
+        const noParallelPixels = noParallel.pixels();
+        assert(countDifferentPixels(noParallelBefore, noParallelPixels) > 0,
+          "Missing-extension fallback left the seeded target unchanged.");
+        assert(countDifferentPixels(drawn, noParallelPixels) === 0,
+          "Missing-extension fallback differs from blocking flush().");
+        noParallel.destroy(); report.passed.push("hidden-extension fallback");
+
+        const noParallelBlocking = makeTarget({ hideParallel: true });
+        noParallelBlocking.block();
+        const noParallelDraws = noParallelBlocking.programs.filter((program) => program.draw);
+        assert(noParallelDraws.length === 1,
+          "Blocking flush without KHR must submit one draw-program link.");
+        assert(countDifferentPixels(drawn, noParallelBlocking.pixels()) === 0,
+          "Blocking path without KHR produced different pixels.");
+        noParallelBlocking.destroy(); report.passed.push("blocking link count without KHR");
+
+        const eagerReference = makeTarget();
+        for (const hideParallel of [false, true]) {
+          const eager = makeTarget({ hideParallel });
+          eager.linkPrograms();
+          const drawPrograms = eager.programs.filter((program) => program.draw);
+          const clipped = drawPrograms.some((program) => hasDefine(program.source, "ENABLE_CLIP_RECT"));
+          assert(drawPrograms.length === (clipped ? 7 : 6), "linkDrawPrograms submitted the wrong set.");
+          const links = eager.programs.length;
+          eager.linkPrograms();
+          if (eager.parallel) {
+            assert(eager.programs.every((program) =>
+              !program.statusReads.some((read) => read.phase === "submit")),
+              "Background submission read LINK_STATUS or COMPLETION_STATUS_KHR.");
+            assert(eager.violations.length === 0, "Background submission queried a pending program.");
+            assert(eager.attempt({ empty: true }) === 0, "Empty frame reported pending programs.");
+            assert(eager.programs.every((program) =>
+              !program.statusReads.some((read) => read.phase === "try")),
+              "Empty frame polled an unused program.");
+            // Without clip planes an outer clip also needs stencil clip reset.
+            const oneProgramFrame = { clipRect: clipped };
+            assert(eager.attempt(oneProgramFrame) > 0, "Closed completion gate did not defer the needed program.");
+            const needed = drawPrograms.filter((program) => program.polls.size > 0);
+            assert(needed.length === 1, "A one-program frame polled unused draw programs.");
+            eager.setGate(true);
+            await eager.untilDrawn(oneProgramFrame);
+            assert(drawPrograms.filter((program) => program !== needed[0]).every((program) =>
+              program.statusReads.length === 0), "Retry polled programs reserved for later frames.");
+          } else {
+            assert(drawPrograms.every((program) => program.complete),
+              "linkDrawPrograms did not finish synchronously without KHR.");
+          }
+          for (const options of [{ mix: true, clipRect: true }, { material: 1, mixedMaterials: true, clipRect: true },
+            { quad: true, material: 1, box: [0, 0, 128, 128], clipRect: true }]) {
+            eagerReference.block(options);
+            if (eager.parallel) await eager.untilDrawn(options);
+            else assert(eager.attempt(options) === 0, "Synchronous prelink left a pending draw program.");
+            assert(countDifferentPixels(eagerReference.pixels(), eager.pixels()) === 0,
+              "Prelinked rendering differs from lazy blocking rendering.");
+          }
+          assert(eager.programs.length === links, "Prelinked draws or a repeated call submitted another link.");
+          eager.destroy();
+        }
+        eagerReference.destroy(); report.passed.push("known-program submission, frame-only polling, and synchronous fallback");
+
+        document.body.dataset.deferredStep = "feather";
+        const feathered = makeTarget();
+        feathered.seed(); const featherBefore = feathered.pixels();
+        const featherOptions = { feathered: true };
+        const featherPending = feathered.attempt(featherOptions);
+        assert(feathered.programs.filter((program) => program.atlas).length >= 2,
+          "Feather fixture did not start feather atlas programs.");
+        if (feathered.parallel) {
+          assert(featherPending > 0, "Feather frame was not pending.");
+          assert(countDifferentPixels(featherBefore, feathered.pixels()) === 0, "Pending feather frame changed the target.");
+          // The fixture only fills, so a pending stroke program must not block it.
+          feathered.blockedFamilies.add("featherStroke");
+          feathered.setGate(true); await feathered.untilDrawn(featherOptions);
+        } else assert(featherPending === 0, "Feather fallback was not immediate.");
+        const featherPixels = feathered.pixels();
+        assert(countOpaquePixels(featherPixels) > 0 && countDifferentPixels(featherBefore, featherPixels) > 0,
+          "Feather frame did not draw visible pixels over the seeded target.");
+        feathered.block(featherOptions);
+        assert(countDifferentPixels(featherPixels, feathered.pixels()) === 0,
+          "Feather tryFlush() differs from blocking flush().");
+        feathered.destroy(); report.passed.push("lazy feather completion gates");
+
+        const imageProbe = makeTarget();
+        imageProbe.block({ quad: true });
+        const quadPixels = imageProbe.pixels();
+        assert(countOpaquePixels(quadPixels) > 0, "The non-mesh Image fixture drew nothing.");
+        assert(imageProbe.programs.some((program) => program.draw && program.family === "image"),
+          "Depth-stencil drawImage did not use an image-mesh program.");
+        assert(!imageProbe.programs.some((program) => hasDefine(program.source, "ENABLE_MODULATED_IMAGE")),
+          "A plain image draw linked M.");
+        imageProbe.block({ paintQuad: true });
+        assert(countDifferentPixels(quadPixels, imageProbe.pixels()) === 0,
+          "The image-mesh route differs from the equivalent path reference.");
+        assert(imageProbe.imageMaterialWrites === 0,
+          "Plain images uploaded material uniforms.");
+        const meshHasH = imageProbe.programs.some((program) => program.family === "image" && hasDefine(program.source, "ENABLE_HSL_BLEND_MODES"));
+        const imageProgramsBeforeMaterial = imageProbe.programs.filter((program) => program.family === "image").length;
+        report.passed.push("DS image quad uses mesh and matches path reference");
+        imageProbe.blitRects.length = 0;
+        imageProbe.block({ quad: true, overlay: true, clear: false, box: [0, 0, 64, 64] });
+        assert(imageProbe.blitRects.length > 0 &&
+          imageProbe.blitRects.every(([x0, y0, x1, y1]) => x1 - x0 <= 64 && y1 - y0 <= 64),
+          "An overlay image quad updated beyond its clip: " + JSON.stringify(imageProbe.blitRects));
+        report.passed.push("overlay image quad updates only its bounds");
+        imageProbe.block({ quad: true, modulatedOpacity: 0.5 });
+        const halfOpacityPixels = imageProbe.pixels();
+        imageProbe.block({ paintQuad: true, modulatedOpacity: 0.5 });
+        assert(countOpaquePixels(halfOpacityPixels) > 0 &&
+          countDifferentPixels(halfOpacityPixels, imageProbe.pixels()) === 0 &&
+          countDifferentPixels(quadPixels, halfOpacityPixels) > 0,
+          "Image opacity differs from the path reference under modulateOpacity.");
+        report.passed.push("image modulated opacity applied once");
+
+
+        for (const material of [1, 2]) {
+          imageProbe.block({ meshQuad: true, material });
+          const materialPixels = imageProbe.pixels();
+          assert(countDifferentPixels(quadPixels, materialPixels) > 0,
+            "An authored image mesh lost its surface material.");
+          imageProbe.block({ quad: true, material });
+          assert(countDifferentPixels(materialPixels, imageProbe.pixels()) === 0,
+            "Materialized drawImage differs from an authored image mesh.");
+          imageProbe.block({ paintQuad: true, material });
+          assert(countDifferentPixels(materialPixels, imageProbe.pixels()) === 0,
+            "Material image mesh differs from its path reference.");
+        }
+        assert(imageProbe.imageMaterialWrites > 0 &&
+          imageProbe.programs.filter((program) => program.family === "image").length === imageProgramsBeforeMaterial + (meshHasH ? 0 : 1) &&
+          !imageProbe.programs.some((program) => hasDefine(program.source, "ENABLE_MODULATED_IMAGE")),
+          "Material image meshes failed to reuse their lean program.");
+        imageProbe.block({ quad: true });
+        const writesAfterReset = imageProbe.imageMaterialWrites;
+        imageProbe.block({ quad: true });
+        assert(imageProbe.imageMaterialWrites === writesAfterReset &&
+          countDifferentPixels(quadPixels, imageProbe.pixels()) === 0,
+          "Plain image meshes retained material state or uploaded uniforms.");
+        assert(imageProbe.violations.length === 0, imageProbe.violations.join("; "));
+        report.passed.push("material image meshes and plain uniform reset");
+
+        imageProbe.block(); const plainPixels = imageProbe.pixels();
+        const hasH = (program) => hasDefine(program.source, "ENABLE_HSL_BLEND_MODES");
+        const usedPaths = () => imageProbe.usedPrograms.filter((program) => hasDefine(program.source, "DRAW_PATH"));
+        assert(usedPaths().length > 0 && usedPaths().every((program) => !hasH(program)),
+          "A plain path used the material program.");
+        imageProbe.block({ material: 1 });
+        assert(usedPaths().some(hasH) && countDifferentPixels(plainPixels, imageProbe.pixels()) > 0,
+          "Gold path did not use its material program.");
+        imageProbe.block({ material: 2 });
+        assert(usedPaths().some(hasH) && countDifferentPixels(plainPixels, imageProbe.pixels()) > 0,
+          "Rainbow path did not use its material program.");
+        imageProbe.block({ mixedMaterials: true });
+        // Compatible plain/material paths share a batch whose features are ORed.
+        assert(usedPaths().length > 0 && usedPaths().every(hasH),
+          "Compatible plain and material paths did not share the material program.");
+        imageProbe.block();
+        assert(usedPaths().every((program) => !hasH(program)) &&
+          countDifferentPixels(plainPixels, imageProbe.pixels()) === 0,
+          "A plain path retained the material program.");
+        imageProbe.destroy(); report.passed.push("opt-in material programs and mixed-path batching");
+
+        for (const board of boards) board.delete();
+        for (const file of files) file.unref();
+        for (const cleanup of cleanups) cleanup();
+        return report;
       }
 
       async function main() {
@@ -363,6 +901,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         assert(countOpaquePixels(firstContext.pixels) > 0 &&
           countDifferentPixels(firstContext.pixels, secondContext.pixels) === 0,
           "Image pixels changed across GL contexts.");
+        const deferredFlush = ${JSON.stringify(legacyComparison)} ? null : await testDeferredFlush(rive, png);
         sharedImage.unref();
         imageBindingInstance.delete();
         imageBindingArtboard.delete();
@@ -530,6 +1069,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
         rive.cleanup?.();
         finish({
           ok: true,
+          deferredFlush,
           defaultOpaquePixels,
           opaquePixels,
           materialDifferences,
@@ -561,7 +1101,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
 
 /** Installs the packed artifact so omitted package files fail the check. */
 async function main(wasmFilename) {
-  const browser = findBrowser();
+  const browser = await findChrome();
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "rive-webgl2-package-"));
   try {
     const packResult = await run(
@@ -599,6 +1139,7 @@ async function main(wasmFilename) {
       imageBindingFixturePath,
       join(temporaryDirectory, "image-binding-fixture.riv"),
     );
+    await copyFile(join(scriptDirectory, "webgl2_test_support.mjs"), join(temporaryDirectory, "webgl2_test_support.mjs"));
     await writeFile(join(temporaryDirectory, "index.html"), testPage(wasmFilename));
 
     const server = await startServer(temporaryDirectory);
@@ -615,13 +1156,14 @@ async function main(wasmFilename) {
         "--dump-dom",
         server.url,
       ]);
-      const markerIndex = browserResult.stdout.indexOf(resultMarker);
+      const markerIndex = browserResult.stdout.indexOf('<pre id="result">' + resultMarker);
+      const resultMarkerOffset = '<pre id="result">'.length;
       if (browserResult.status !== 0 || markerIndex < 0) {
         throw new Error(
           `Chrome did not complete the package test.\n${browserResult.stderr}\n${browserResult.stdout}`,
         );
       }
-      const resultStart = markerIndex + resultMarker.length;
+      const resultStart = markerIndex + resultMarkerOffset + resultMarker.length;
       const resultEnd = browserResult.stdout.indexOf("</pre>", resultStart);
       const result = JSON.parse(browserResult.stdout.slice(resultStart, resultEnd));
       if (!result.ok) {
@@ -633,6 +1175,23 @@ async function main(wasmFilename) {
       console.log("Packed WebGL2 browser test passed:", wasmFilename, result);
     } finally {
       await server.close();
+    }
+    if (process.env.RIVE_TEST_GAME_ROOT) {
+      const installedPackage = join(temporaryDirectory, "node_modules/@magiccircle/rive-webgl2-advanced");
+      await writeFile(join(installedPackage, "glsl.glsl.exports.h"), shaderExports);
+      const contentResult = await run(process.execPath, [
+        join(scriptDirectory, "compare_webgl2_pixels.mjs"), installedPackage, installedPackage,
+        process.env.RIVE_TEST_GAME_ROOT, join(temporaryDirectory, "content-check"),
+      ], { env: { ...process.env, RIVE_TEST_LINK_PROGRAMS: "1", RIVE_TEST_WASM: wasmFilename } });
+      if (contentResult.status !== 0) {
+        throw new Error(`Magic Garden eager-link check failed:\n${contentResult.stderr}\n${contentResult.stdout}`);
+      }
+      const content = JSON.parse(await readFile(join(temporaryDirectory, "content-check/pixel-comparison.json"), "utf8"));
+      console.log("Magic Garden first-try program check passed:", wasmFilename,
+        content.caseCount, "cases; KHR exposed:", content.programs.map((side) => side.parallel),
+        "; no further draw-program links.");
+    } else {
+      console.log("Magic Garden eager-link check skipped: set RIVE_TEST_GAME_ROOT and PLAYWRIGHT_MODULE.");
     }
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });

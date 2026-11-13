@@ -486,6 +486,7 @@ public:
 
     void beginScreenFrame(gpu::LoadAction loadAction, ColorInt clearColor)
     {
+        m_clearRects.clear();
         RenderContext::FrameDescriptor frameDescriptor = {
             .renderTargetWidth = activeRenderTarget()->width(),
             .renderTargetHeight = activeRenderTarget()->height(),
@@ -537,6 +538,26 @@ public:
     }
 
     void restoreClipRect() { restore(); }
+
+    void clearRect(float l, float t, float r, float b)
+    {
+#if defined(RIVE_CANVAS) && defined(RIVE_ORE)
+        if (m_session != nullptr)
+        {
+            return;
+        }
+#endif
+        if (m_screenFrame.loadAction == gpu::LoadAction::preserveRenderTarget)
+        {
+            Mat2D matrix;
+            currentTransform(&matrix);
+            AABB rect = matrix.mapBoundingBox(AABB(l, t, r, b));
+            if (!rect.isEmptyOrNaN())
+            {
+                m_clearRects.push_back(rect.roundOut());
+            }
+        }
+    }
 
     void setSurfaceMaterial(uint32_t value,
                             float l,
@@ -648,24 +669,47 @@ public:
         }
     }
 
-    void flush()
+    void flush() { std::ignore = flushFrame(false); }
+
+    size_t tryFlush() { return flushFrame(true); }
+
+    void linkDrawPrograms()
+    {
+        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+        renderContextGL()->linkDrawPrograms();
+    }
+
+private:
+    size_t flushFrame(bool tryPrograms)
     {
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)
         if (m_session != nullptr)
         {
             deferredFlush();
-            return;
+            return 0;
         }
 #endif
         ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
-        m_renderContext->flush({.renderTarget = activeRenderTarget()});
+        RenderContext::FlushResources resources = {
+            .renderTarget = activeRenderTarget(), .clearRects = m_clearRects};
+        size_t pending = 0;
+        if (tryPrograms)
+        {
+            pending = m_renderContext->tryFlush(resources);
+        }
+        else
+        {
+            m_renderContext->flush(resources);
+        }
+        m_clearRects.clear();
         WebGL2Factory::Instance()->bindActiveRenderer(nullptr);
 #ifdef RIVE_CANVAS
-        // The frame is over, so nothing is still compositing through these.
         m_compositeRenderers.clear();
 #endif
+        return pending;
     }
 
+public:
     /**
      * Set an external WebGL texture as the render target. When set,
      * clear()/beginOverlayFrame()/flush() render to this texture
@@ -954,6 +998,7 @@ private:
     std::unique_ptr<RenderContext> m_renderContext;
     rcp<FramebufferRenderTargetGL> m_renderTarget;
     RenderContext::FrameDescriptor m_screenFrame;
+    std::vector<IAABB> m_clearRects;
 #ifdef RIVE_CANVAS
     // One entry per canvas pass that is currently open, outermost first. A
     // single slot would do for one cached artboard, but they nest: the inner
@@ -1265,7 +1310,8 @@ bool sessionRecordedThisFrame(WebGL2DeferredSession* session)
 
 WebGL2Renderer* makeWebGL2Renderer(int width, int height)
 {
-    if (auto renderContext = RenderContextGLImpl::MakeContext())
+    if (auto renderContext = RenderContextGLImpl::MakeContext(
+            {.shaderCompilationMode = ShaderCompilationMode::onlyUbershaders}))
     {
         return new WebGL2Renderer(std::move(renderContext), width, height);
     }
@@ -1338,6 +1384,9 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
     class_<WebGL2Renderer, base<Renderer>>("WebGL2Renderer")
         .function("clear", &WebGL2Renderer::clear)
         .function("flush", &WebGL2Renderer::flush)
+        .function("tryFlush", &WebGL2Renderer::tryFlush)
+        .function("linkDrawPrograms", &WebGL2Renderer::linkDrawPrograms)
+        .function("clearRect", &WebGL2Renderer::clearRect)
         .function("resize", &WebGL2Renderer::resize)
         .function("saveClipRect", &WebGL2Renderer::saveClipRect)
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)

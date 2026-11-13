@@ -3,7 +3,7 @@
 This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
 official `rive-wasm` `2.42.2` tag (`dc4d3a12`) and the matching
 `rive-runtime` `runtime-v0.1.411` tag (`30742b4c`). The package version is
-`2.42.2-mc.3`. Both repositories replay the Magic Circle changes on these
+`2.42.2-mc.6`. Both repositories replay the Magic Circle changes on these
 upstream bases; the runtime submodule points to the Magic Circle mirror.
 
 The fork adds:
@@ -13,14 +13,36 @@ The fork adds:
 - wrapping a WebGL texture as a Rive image;
 - deformation-aware animated/static Gold and static Rainbow materials;
 - per-image material overrides and worker-safe OffscreenCanvas creation;
-- a generated JavaScript export of the same material shader source; and
+- a generated JavaScript export of the same material shader source;
 - asynchronous ImageBitmap decoding before the first image upload, with
   premultiplied alpha, bitmap cleanup, and an HTMLImageElement fallback for
-  later contexts or browsers that cannot decode a bitmap.
+  later contexts or browsers that cannot decode a bitmap;
+- `tryFlush()` consumes a recorded frame and draws only when every required
+  shader is linked; a pending frame leaves its target untouched. Overlay
+  `clearRect()` clears recorded atlas regions only when the frame draws.
+  `flush()` remains blocking and honors the same rectangles. An artboard
+  cached as a bitmap (`BitmapCache`, which no Magic Circle file uses) flushes
+  the target mid-frame, so neither guarantee holds for that frame; and
+- an ubershader-only WebGL2 renderer, cached image quads in depth-stencil mode,
+  and per-draw opt-in clip-rect, material/HSL and image-paint features. Compatible
+  plain and material paths share batches whose requested features are ORed.
+  Plain srcOver and material meshes use
+  separate programs. Mesh materials use fragment uniforms without adding vertex
+  data. Plain meshes upload no material uniforms except a mode reset if a mesh
+  with an HSL blend mode shares a program last used by a materialized mesh.
+
+`linkDrawPrograms()` starts Magic Garden's depth-stencil draw-program links in
+the background with `KHR_parallel_shader_compile`, without reading link status.
+Without the extension it links synchronously, before revealing the loading
+animation. `tryFlush()` polls and finishes only the programs its frame needs;
+unused background programs remain unqueried. Renderers that do not call it
+retain lazy linking through `tryFlush()`/`flush()`.
 
 `2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
 decoding before invoking `decodeImage`'s callback, reports invalid images as
 `null`, and releases Blob URLs and native decode references on failure.
+`2.42.2-mc.4–mc.6` add deferred shader-ready flushes, atomic overlay clears,
+image-mesh materials and lean ubershaders.
 The image-element fallback preserves the upstream runtime's multi-context
 contract; Magic Circle's current renderer sessions do not share images
 across contexts.
@@ -68,10 +90,44 @@ project, starts a local server, and drives real WebGL2 in headless Chrome. It
 checks both WASM variants with the same JS loader: public fork APIs,
 normal/Gold/Rainbow rendering, external render targets, overlay preservation,
 texture-backed images, decode readiness and failures, Blob URL and bitmap
-cleanup, matching image uploads across two GL contexts, and teardown.
+cleanup, matching image uploads across two GL contexts, and teardown. It also
+checks pending-frame preservation, completion-only polling, mixed shader
+families, lazy feather programs, overlay clear orientation, extension fallback,
+material program selection, mesh uniform resets, modulated image opacity, and
+image-quad update bounds.
 Set `CHROME_BIN` if Chrome is not on PATH.
 Set `RIVE_TEST_FIXTURE` and `RIVE_TEST_ARTBOARD` to check a particular asset;
 `RIVE_TEST_WASM` optionally restricts the binary under test.
+Set `RIVE_TEST_HIDE_PARALLEL=1` to run the browser checks with the parallel
+compile extension hidden from every context.
+Set `RIVE_TEST_GAME_ROOT` to the Magic Circle game checkout and
+`PLAYWRIGHT_MODULE` to an installed Playwright module to include the 209-case
+content check on the packed package. It calls `linkDrawPrograms()` immediately
+after creation, requires seven programs (six without clip-plane support) to be
+submitted without status reads with KHR, or linked synchronously without it.
+After allowing background links to finish without polling, every case must draw
+on its first `tryFlush()` with no further draw-program links. It uses the
+host GPU; changes to shipped content that need another program fail this check.
+
+`wasm/scripts/compare_webgl2_pixels.mjs` compares two staged packages with
+ubershader rendering, using host-GPU ANGLE GL. It samples all 32 pets
+with hats and ties in plain, Gold, and Rainbow, splash files, avatar cosmetics,
+and Gold/Rainbow pets at frames 0, 30, 60, and 90. The output includes per-case
+pixel differences, asset/package hashes, and every linked draw program's defines.
+Save the baseline's generated `glsl.glsl.exports.h` beside its package before
+rebuilding (from `wasm/build/webgl2_advanced/bin/release/include/generated/shaders/`).
+Set `PLAYWRIGHT_MODULE` to an installed Playwright module and `CHROME_BIN`
+to a host Chrome if needed, then run:
+
+```sh
+node wasm/scripts/compare_webgl2_pixels.mjs \
+  /path/to/baseline-package js/npm/webgl2_advanced /path/to/magiccircle.gg /path/to/results
+```
+
+Synthetic authored meshes use the same mesh in both builds; an mc.4 baseline
+uses its equivalent image-painted path because it does not materialize meshes.
+The mc.5 results are retained in `benchmarks/lean-ubershaders-pixels.json`, and
+the mc.6 comparison against mc.5 is in `benchmarks/optin-material-pixels.json`.
 
 ## Pet loading benchmark
 
