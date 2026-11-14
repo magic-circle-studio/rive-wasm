@@ -3,7 +3,7 @@
 This branch builds `@magiccircle/rive-webgl2-advanced`. It starts from the
 official `rive-wasm` `2.42.2` tag (`dc4d3a12`) and the matching
 `rive-runtime` `runtime-v0.1.411` tag (`30742b4c`). The package version is
-`2.42.2-mc.6`. Both repositories replay the Magic Circle changes on these
+`2.42.2-mc.7`. Both repositories replay the Magic Circle changes on these
 upstream bases; the runtime submodule points to the Magic Circle mirror.
 
 The fork adds:
@@ -37,6 +37,17 @@ Without the extension it links synchronously, before revealing the loading
 animation. `tryFlush()` polls and finishes only the programs its frame needs;
 unused background programs remain unqueried. Renderers that do not call it
 retain lazy linking through `tryFlush()`/`flush()`.
+
+`drawPipelineWarmup()` draws Magic Garden's next draw-pipeline warm-up into
+the target, alone in its own frame, and returns how many are left. Each is
+one paint (opaque, translucent, screen blend, gradient or image mesh), plain
+or Gold, under a clip rect as an atlas slot is drawn, plus two shapes in
+their own ellipse clip paths for clip updates and the clip reset. On Safari a
+program's first draw in each GPU state builds a pipeline; drawing these
+before any art builds them all. A warm-up whose programs are still linking
+draws nothing and stays next. With `linkDrawPrograms()` this is the game's
+whole draw-pipeline set; the game's `pipelineWarmup.webgl.test.ts` checks
+shipped art against it.
 
 `2.42.2-mc.2` introduced bitmap uploads. `2.42.2-mc.3` waits for browser
 decoding before invoking `decodeImage`'s callback, reports invalid images as
