@@ -114,7 +114,7 @@ compile extension hidden from every context.
 Set `RIVE_TEST_GAME_ROOT` to the Magic Circle game checkout and
 `PLAYWRIGHT_MODULE` to an installed Playwright module to include the 209-case
 content check on the packed package. It calls `linkDrawPrograms()` immediately
-after creation, requires seven programs (six without clip-plane support) to be
+after creation, requires eight programs (seven without clip-plane support) to be
 submitted without status reads with KHR, or linked synchronously without it.
 After allowing background links to finish without polling, every case must draw
 on its first `tryFlush()` with no further draw-program links. It uses the
