@@ -596,7 +596,7 @@ const testPage = (wasmFilename) => String.raw`<!doctype html>
           eager.linkPrograms();
           const drawPrograms = eager.programs.filter((program) => program.draw);
           const clipped = drawPrograms.some((program) => hasDefine(program.source, "ENABLE_CLIP_RECT"));
-          assert(drawPrograms.length === (clipped ? 7 : 6), "linkDrawPrograms submitted the wrong set.");
+          assert(drawPrograms.length === (clipped ? 8 : 7), "linkDrawPrograms submitted the wrong set.");
           const links = eager.programs.length;
           eager.linkPrograms();
           if (eager.parallel) {
