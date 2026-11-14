@@ -251,6 +251,15 @@ export declare class RendererWrapper {
    */
   linkDrawPrograms(): void;
   /**
+   * WebGL2 only. Draws Magic Garden's next draw-pipeline warm-up into the
+   * target, alone in its own frame: with linkDrawPrograms(), the game's whole
+   * set of draw programs and GPU states. On Safari each program's first draw
+   * in each state builds a pipeline, so draw them all before the art. A
+   * warm-up whose programs are still linking draws nothing and stays next.
+   * Returns how many are left. Overwrites the target's pixels.
+   */
+  drawPipelineWarmup(): number;
+  /**
    * WebGL2 overlay frames only. Records a target rectangle, in saveClipRect
    * coordinates, to clear to transparent before this frame's draws. A frame
    * that tryFlush() does not draw clears nothing. Full-clear frames ignore it.
