@@ -28,9 +28,8 @@
 #include <emscripten/html5.h>
 using namespace emscripten;
 
-#include <array>
+#include <iterator>
 #include <stdint.h>
-#include <string.h>
 #include <stdio.h>
 #include <string>
 #include <map>
@@ -188,13 +187,7 @@ EM_JS(void, decode_image, (uintptr_t renderImage, uintptr_t imgDataPtr, int imgD
             bitmapPromise.then(function(bitmap) {
                 if (bitmap)
                 {
-                    var bitmaps = Module["imageBitmaps"];
-                    if (!bitmaps)
-                    {
-                        bitmaps = new Map();
-                        Module["imageBitmaps"] = bitmaps;
-                    }
-                    bitmaps.set(renderImage, bitmap);
+                    image["bitmap"] = bitmap;
                 }
                 // The constructor's decode ref keeps renderImage alive until
                 // _setWebImage releases it, even if its caller already left.
@@ -229,8 +222,7 @@ EM_JS(void, upload_image, (EMSCRIPTEN_WEBGL_CONTEXT_HANDLE gl, uintptr_t renderI
     {
         return;
     }
-    var bitmaps = Module["imageBitmaps"];
-    var bitmap = bitmaps && bitmaps.get(renderImage);
+    var bitmap = image["bitmap"];
     gl = GL.getContext(gl).GLctx;
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap || image);
@@ -238,7 +230,7 @@ EM_JS(void, upload_image, (EMSCRIPTEN_WEBGL_CONTEXT_HANDLE gl, uintptr_t renderI
     if (bitmap)
     {
         bitmap.close();
-        bitmaps.delete(renderImage);
+        delete image["bitmap"];
     }
 });
 
@@ -255,12 +247,9 @@ EM_JS(void, delete_image, (uintptr_t renderImage), {
         return;
     }
     images.delete(renderImage);
-    var bitmaps = Module["imageBitmaps"];
-    var bitmap = bitmaps && bitmaps.get(renderImage);
-    if (bitmap)
+    if (image["bitmap"])
     {
-        bitmap.close();
-        bitmaps.delete(renderImage);
+        image["bitmap"].close();
     }
 });
 
@@ -470,42 +459,22 @@ public:
         ++m_currentFrameID;
     }
 
+    // Like clear(), but draws over the target's existing pixels.
     void beginOverlayFrame()
     {
-#if defined(RIVE_CANVAS) && defined(RIVE_ORE)
-        if (m_session != nullptr)
-        {
-            m_host.beginRecord(/*clear=*/false, /*color=*/0);
-            m_session->beginTargetFrame(m_screenTarget);
-            m_target = m_host.screenRenderer();
-            ++m_currentFrameID;
-            return;
-        }
-#endif
         beginScreenFrame(gpu::LoadAction::preserveRenderTarget, 0);
         ++m_currentFrameID;
     }
 
     void beginScreenFrame(gpu::LoadAction loadAction, ColorInt clearColor)
     {
-        m_clearRects.clear();
         RenderContext::FrameDescriptor frameDescriptor = {
             .renderTargetWidth = activeRenderTarget()->width(),
             .renderTargetHeight = activeRenderTarget()->height(),
             .loadAction = loadAction,
             .clearColor = clearColor,
         };
-        if (m_textureRenderTarget)
-        {
-            // Texture targets don't have canvas-level MSAA. Use
-            // internal MSAA when PLS is not available.
-            if (!m_renderContext->platformFeatures().supportsRasterOrderingMode &&
-                !m_renderContext->platformFeatures().supportsAtomicMode)
-            {
-                frameDescriptor.msaaSampleCount = 4;
-            }
-        }
-        else if (m_renderTarget->sampleCount() > 1)
+        if (!m_textureRenderTarget && m_renderTarget->sampleCount() > 1)
         {
             // Use MSAA if we were given a canvas with 'antialias: true'.
             frameDescriptor.msaaSampleCount = m_renderTarget->sampleCount();
@@ -525,8 +494,6 @@ public:
         WebGL2Factory::Instance()->bindActiveRenderer(this);
     }
 
-public:
-
     void saveClipRect(float l, float t, float r, float b)
     {
         save();
@@ -541,26 +508,6 @@ public:
 
     void restoreClipRect() { restore(); }
 
-    void clearRect(float l, float t, float r, float b)
-    {
-#if defined(RIVE_CANVAS) && defined(RIVE_ORE)
-        if (m_session != nullptr)
-        {
-            return;
-        }
-#endif
-        if (m_screenFrame.loadAction == gpu::LoadAction::preserveRenderTarget)
-        {
-            Mat2D matrix;
-            currentTransform(&matrix);
-            AABB rect = matrix.mapBoundingBox(AABB(l, t, r, b));
-            if (!rect.isEmptyOrNaN())
-            {
-                m_clearRects.push_back(rect.roundOut());
-            }
-        }
-    }
-
     void setSurfaceMaterial(uint32_t value,
                             float l,
                             float t,
@@ -568,7 +515,11 @@ public:
                             float b,
                             float timeSeconds)
     {
-        RiveRenderer::setSurfaceMaterial(surfaceMaterialFromValue(value),
+        // An unknown material draws plain.
+        auto material = value <= static_cast<uint32_t>(SurfaceMaterial::rainbow)
+                            ? static_cast<SurfaceMaterial>(value)
+                            : SurfaceMaterial::none;
+        RiveRenderer::setSurfaceMaterial(material,
                                          AABB(l, t, r, b),
                                          timeSeconds);
     }
@@ -671,202 +622,44 @@ public:
         }
     }
 
-    void flush() { std::ignore = flushFrame(false); }
+    void flush()
+    {
+        std::ignore = flushFrame(RenderContext::PendingPrograms::wait);
+    }
 
-    size_t tryFlush() { return flushFrame(true); }
-
+    /**
+     * Starts linking every warm-up's programs, in the order the warm-ups draw,
+     * and draws nothing. Without KHR_parallel_shader_compile the links finish
+     * before this returns.
+     */
     void linkDrawPrograms()
     {
-        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
-        renderContextGL()->linkDrawPrograms();
+        for (const PipelineWarmup& warmup : kPipelineWarmups)
+        {
+            std::ignore = runPipelineWarmup(
+                warmup, RenderContext::PendingPrograms::linkOnly);
+        }
     }
 
     /**
      * Draws Magic Garden's next draw-pipeline warm-up into the target, alone in
-     * its own frame. With linkDrawPrograms() this is the game's whole set: on
-     * Safari each program's first draw in each GPU state builds a pipeline, so
-     * the game draws them all before its art. A warm-up whose programs are
-     * still linking draws nothing and stays next. Returns how many are left.
+     * its own frame. The warm-ups draw the game's whole set of draw programs
+     * and GPU states: on Safari each program's first draw in each GPU state
+     * builds a pipeline, so the game draws them all before its art. A warm-up
+     * whose programs are still linking draws nothing and stays next. Returns
+     * how many are left.
      */
     size_t drawPipelineWarmup()
     {
-        if (m_pipelineWarmupCount == kPipelineWarmups.size())
-        {
-            return 0;
-        }
-        beginOverlayFrame();
-        drawPipelineWarmupItem(kPipelineWarmups[m_pipelineWarmupCount]);
-        if (flushFrame(true) == 0)
+        if (m_pipelineWarmupCount < std::size(kPipelineWarmups) &&
+            runPipelineWarmup(kPipelineWarmups[m_pipelineWarmupCount],
+                              RenderContext::PendingPrograms::skipFrame))
         {
             ++m_pipelineWarmupCount;
         }
-        return kPipelineWarmups.size() - m_pipelineWarmupCount;
+        return std::size(kPipelineWarmups) - m_pipelineWarmupCount;
     }
 
-private:
-    struct PipelineWarmup
-    {
-        enum class Paint : uint8_t
-        {
-            opaque,
-            translucent,
-            screen,
-            gradient,
-            imageMesh,
-        };
-        Paint paint;
-        SurfaceMaterial material;
-        // Two shapes, each in its own ellipse clip path: the second stencil
-        // clip clears the first with a clip reset.
-        bool ellipseClips;
-    };
-
-    // Each paint the art uses, drawn as the game draws an atlas slot: under a
-    // clip rect, which devices with clip planes draw with their own programs.
-    static constexpr std::array<PipelineWarmup, 11> kPipelineWarmups = {{
-        {PipelineWarmup::Paint::opaque, SurfaceMaterial::none, false},
-        {PipelineWarmup::Paint::opaque, SurfaceMaterial::gold, false},
-        {PipelineWarmup::Paint::translucent, SurfaceMaterial::none, false},
-        {PipelineWarmup::Paint::translucent, SurfaceMaterial::gold, false},
-        {PipelineWarmup::Paint::screen, SurfaceMaterial::none, false},
-        {PipelineWarmup::Paint::screen, SurfaceMaterial::gold, false},
-        {PipelineWarmup::Paint::gradient, SurfaceMaterial::none, false},
-        {PipelineWarmup::Paint::imageMesh, SurfaceMaterial::none, false},
-        {PipelineWarmup::Paint::imageMesh, SurfaceMaterial::gold, false},
-        {PipelineWarmup::Paint::opaque, SurfaceMaterial::none, true},
-        {PipelineWarmup::Paint::opaque, SurfaceMaterial::gold, true},
-    }};
-
-    void drawPipelineWarmupItem(const PipelineWarmup& warmup)
-    {
-        using Paint = PipelineWarmup::Paint;
-        auto* factory = WebGL2Factory::Instance();
-        auto rect = [&](float x) {
-            RawPath path;
-            path.addRect(AABB(x, 16, x + 48, 48));
-            return factory->makeRenderPath(path, FillRule::nonZero);
-        };
-        save();
-        // The scene spans 160x64; fit it inside the target, since Rive culls a
-        // draw outside it before it reaches the GPU.
-        RenderTarget* target = activeRenderTarget();
-        float scale = std::min(target->width() / 160.f, target->height() / 64.f);
-        transform(Mat2D::fromScale(scale, scale));
-        RiveRenderer::setSurfaceMaterial(warmup.material,
-                                         AABB(0, 0, 160, 64),
-                                         0);
-        saveClipRect(0, 0, 160, 64);
-        if (warmup.paint == Paint::imageMesh)
-        {
-            drawPipelineWarmupMesh();
-        }
-        else
-        {
-            rcp<RenderPaint> paint(factory->makeRenderPaint());
-            paint->style(RenderPaintStyle::fill);
-            paint->color(warmup.paint == Paint::translucent ? 0x80e03080
-                                                            : 0xffe04080);
-            if (warmup.paint == Paint::screen)
-            {
-                paint->blendMode(BlendMode::screen);
-            }
-            else if (warmup.paint == Paint::gradient)
-            {
-                const ColorInt colors[] = {0xffe04080, 0xff3080e0};
-                const float stops[] = {0, 1};
-                paint->shader(
-                    factory->makeLinearGradient(16, 16, 64, 48, colors, stops, 2));
-            }
-            for (float x : {16.f, 96.f})
-            {
-                if (!warmup.ellipseClips)
-                {
-                    drawPath(rect(x).get(), paint.get());
-                    break;
-                }
-                RawPath oval;
-                oval.addOval(AABB(x, 8, x + 48, 56));
-                rcp<RenderPath> ellipse =
-                    factory->makeRenderPath(oval, FillRule::nonZero);
-                save();
-                clipPath(ellipse.get());
-                drawPath(rect(x).get(), paint.get());
-                restore();
-            }
-        }
-        restoreClipRect();
-        restore();
-    }
-
-    // A translucent image drawn as a two-triangle mesh.
-    void drawPipelineWarmupMesh()
-    {
-        if (m_pipelineWarmupImage == nullptr)
-        {
-            const uint8_t pixel[] = {128, 32, 64, 128};
-            m_pipelineWarmupImage = make_rcp<RiveRenderImage>(
-                renderContextGL()->makeImageTexture(1,
-                                                    1,
-                                                    1,
-                                                    GPUTextureFormat::rgba32,
-                                                    pixel));
-            auto buffer = [&](RenderBufferType type, const auto& data) {
-                auto result = m_renderContext->makeRenderBuffer(
-                    type,
-                    RenderBufferFlags::mappedOnceAtInitialization,
-                    sizeof(data));
-                memcpy(result->map(), data, sizeof(data));
-                result->unmap();
-                return result;
-            };
-            const float vertices[] = {16, 16, 64, 16, 64, 48, 16, 48};
-            const float uvs[] = {0, 0, 1, 0, 1, 1, 0, 1};
-            const uint16_t indices[] = {0, 1, 2, 0, 2, 3};
-            m_pipelineWarmupVertices = buffer(RenderBufferType::vertex, vertices);
-            m_pipelineWarmupUVs = buffer(RenderBufferType::vertex, uvs);
-            m_pipelineWarmupIndices = buffer(RenderBufferType::index, indices);
-        }
-        RiveRenderer::drawImageMesh(m_pipelineWarmupImage.get(),
-                                    ImageSampler::LinearClamp(),
-                                    m_pipelineWarmupVertices,
-                                    m_pipelineWarmupUVs,
-                                    m_pipelineWarmupIndices,
-                                    4,
-                                    6,
-                                    BlendMode::srcOver,
-                                    1);
-    }
-
-    size_t flushFrame(bool tryPrograms)
-    {
-#if defined(RIVE_CANVAS) && defined(RIVE_ORE)
-        if (m_session != nullptr)
-        {
-            deferredFlush();
-            return 0;
-        }
-#endif
-        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
-        RenderContext::FlushResources resources = {
-            .renderTarget = activeRenderTarget(), .clearRects = m_clearRects};
-        size_t pending = 0;
-        if (tryPrograms)
-        {
-            pending = m_renderContext->tryFlush(resources);
-        }
-        else
-        {
-            m_renderContext->flush(resources);
-        }
-        m_clearRects.clear();
-        WebGL2Factory::Instance()->bindActiveRenderer(nullptr);
-#ifdef RIVE_CANVAS
-        m_compositeRenderers.clear();
-#endif
-        return pending;
-    }
-
-public:
     /**
      * Set an external WebGL texture as the render target. When set,
      * clear()/beginOverlayFrame()/flush() render to this texture
@@ -1130,6 +923,217 @@ public:
     }
 
 private:
+    struct PipelineWarmup
+    {
+        enum class Paint : uint8_t
+        {
+            opaque,
+            translucent,
+            screen,
+            gradient,
+            imageMesh,
+        };
+        enum class Shape : uint8_t
+        {
+            rect,
+            // Two rects, each in its own ellipse clip path: the second clip
+            // clears the first with a clip reset.
+            ellipseClips,
+            // A fill this large in pixels draws its interior as triangles.
+            large,
+            // Pixel local storage draws clockwise fills with their own
+            // programs.
+            clockwise,
+        };
+        Paint paint;
+        SurfaceMaterial material;
+        Shape shape;
+    };
+
+    // Each paint the art uses, drawn as the game draws an atlas slot: under a
+    // clip rect, which devices with clip planes draw with their own programs.
+    static constexpr PipelineWarmup kPipelineWarmups[] = {
+        {PipelineWarmup::Paint::opaque,
+         SurfaceMaterial::none,
+         PipelineWarmup::Shape::rect},
+        {PipelineWarmup::Paint::opaque,
+         SurfaceMaterial::gold,
+         PipelineWarmup::Shape::rect},
+        {PipelineWarmup::Paint::translucent,
+         SurfaceMaterial::none,
+         PipelineWarmup::Shape::rect},
+        {PipelineWarmup::Paint::translucent,
+         SurfaceMaterial::gold,
+         PipelineWarmup::Shape::rect},
+        {PipelineWarmup::Paint::screen,
+         SurfaceMaterial::none,
+         PipelineWarmup::Shape::rect},
+        {PipelineWarmup::Paint::screen,
+         SurfaceMaterial::gold,
+         PipelineWarmup::Shape::rect},
+        {PipelineWarmup::Paint::gradient,
+         SurfaceMaterial::none,
+         PipelineWarmup::Shape::rect},
+        {PipelineWarmup::Paint::imageMesh,
+         SurfaceMaterial::none,
+         PipelineWarmup::Shape::rect},
+        {PipelineWarmup::Paint::opaque,
+         SurfaceMaterial::none,
+         PipelineWarmup::Shape::ellipseClips},
+        {PipelineWarmup::Paint::opaque,
+         SurfaceMaterial::gold,
+         PipelineWarmup::Shape::ellipseClips},
+        {PipelineWarmup::Paint::opaque,
+         SurfaceMaterial::none,
+         PipelineWarmup::Shape::large},
+        {PipelineWarmup::Paint::opaque,
+         SurfaceMaterial::none,
+         PipelineWarmup::Shape::clockwise},
+    };
+
+    // Draws one warm-up alone in its own frame. Returns whether it drew.
+    bool runPipelineWarmup(const PipelineWarmup& warmup,
+                           RenderContext::PendingPrograms pendingPrograms)
+    {
+        // Building the warm-up mesh calls GL.
+        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+        beginOverlayFrame();
+        drawPipelineWarmupItem(warmup);
+        return flushFrame(pendingPrograms);
+    }
+
+    void drawPipelineWarmupItem(const PipelineWarmup& warmup)
+    {
+        using Paint = PipelineWarmup::Paint;
+        using Shape = PipelineWarmup::Shape;
+        auto* factory = WebGL2Factory::Instance();
+        save();
+        // The scene spans 160x64; fit it inside the target, since Rive culls a
+        // draw outside it before it reaches the GPU.
+        RenderTarget* target = activeRenderTarget();
+        float scale =
+            std::min({1.f, target->width() / 160.f, target->height() / 64.f});
+        auto rect = [&](float x) {
+            // Rive triangulates fills of 512x512 target pixels and more; the
+            // clip rect keeps this one inside the scene.
+            float size = warmup.shape == Shape::large ? 520 / scale : 32;
+            RawPath path;
+            path.addRect(AABB(x, 16, x + std::max(48.f, size), 16 + size));
+            return factory->makeRenderPath(path,
+                                           warmup.shape == Shape::clockwise
+                                               ? FillRule::clockwise
+                                               : FillRule::nonZero);
+        };
+        transform(Mat2D::fromScale(scale, scale));
+        RiveRenderer::setSurfaceMaterial(warmup.material,
+                                         AABB(0, 0, 160, 64),
+                                         0);
+        saveClipRect(0, 0, 160, 64);
+        if (warmup.paint == Paint::imageMesh)
+        {
+            drawPipelineWarmupMesh();
+        }
+        else
+        {
+            rcp<RenderPaint> paint(factory->makeRenderPaint());
+            paint->style(RenderPaintStyle::fill);
+            paint->color(warmup.paint == Paint::translucent ? 0x80e03080
+                                                            : 0xffe04080);
+            if (warmup.paint == Paint::screen)
+            {
+                paint->blendMode(BlendMode::screen);
+            }
+            else if (warmup.paint == Paint::gradient)
+            {
+                const ColorInt colors[] = {0xffe04080, 0xff3080e0};
+                const float stops[] = {0, 1};
+                paint->shader(
+                    factory->makeLinearGradient(16, 16, 64, 48, colors, stops, 2));
+            }
+            for (float x : {16.f, 96.f})
+            {
+                if (warmup.shape != Shape::ellipseClips)
+                {
+                    drawPath(rect(x).get(), paint.get());
+                    break;
+                }
+                RawPath oval;
+                oval.addOval(AABB(x, 8, x + 48, 56));
+                rcp<RenderPath> ellipse =
+                    factory->makeRenderPath(oval, FillRule::nonZero);
+                save();
+                clipPath(ellipse.get());
+                drawPath(rect(x).get(), paint.get());
+                restore();
+            }
+        }
+        restoreClipRect();
+        restore();
+    }
+
+    // A translucent image drawn as a two-triangle mesh: depth-stencil frames
+    // draw every image so, and pixel local storage mesh-deformed ones.
+    void drawPipelineWarmupMesh()
+    {
+        auto& mesh = m_pipelineWarmupMesh;
+        if (mesh.image == nullptr)
+        {
+            const uint8_t pixel[] = {128, 32, 64, 128};
+            mesh.image = make_rcp<RiveRenderImage>(
+                renderContextGL()->makeImageTexture(1,
+                                                    1,
+                                                    1,
+                                                    GPUTextureFormat::rgba32,
+                                                    pixel));
+            auto buffer = [&](RenderBufferType type, const auto& data) {
+                auto result = m_renderContext->makeRenderBuffer(
+                    type,
+                    RenderBufferFlags::mappedOnceAtInitialization,
+                    sizeof(data));
+                memcpy(result->map(), data, sizeof(data));
+                result->unmap();
+                return result;
+            };
+            const float vertices[] = {16, 16, 64, 16, 64, 48, 16, 48};
+            const float uvs[] = {0, 0, 1, 0, 1, 1, 0, 1};
+            const uint16_t indices[] = {0, 1, 2, 0, 2, 3};
+            mesh.vertices = buffer(RenderBufferType::vertex, vertices);
+            mesh.uvs = buffer(RenderBufferType::vertex, uvs);
+            mesh.indices = buffer(RenderBufferType::index, indices);
+        }
+        RiveRenderer::drawImageMesh(mesh.image.get(),
+                                    ImageSampler::LinearClamp(),
+                                    mesh.vertices,
+                                    mesh.uvs,
+                                    mesh.indices,
+                                    4,
+                                    6,
+                                    BlendMode::srcOver,
+                                    1);
+    }
+
+    // Returns whether the frame drew.
+    bool flushFrame(RenderContext::PendingPrograms pendingPrograms)
+    {
+#if defined(RIVE_CANVAS) && defined(RIVE_ORE)
+        if (m_session != nullptr)
+        {
+            deferredFlush();
+            return true;
+        }
+#endif
+        ScopedGLContextMakeCurrent makeCurrent(m_contextGL);
+        bool drawn =
+            m_renderContext->flush({.renderTarget = activeRenderTarget()},
+                                   pendingPrograms);
+        WebGL2Factory::Instance()->bindActiveRenderer(nullptr);
+#ifdef RIVE_CANVAS
+        // The frame is over, so nothing is still compositing through these.
+        m_compositeRenderers.clear();
+#endif
+        return drawn;
+    }
+
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)
     void deferredFlush();
 #endif
@@ -1155,12 +1159,14 @@ private:
     std::unique_ptr<RenderContext> m_renderContext;
     rcp<FramebufferRenderTargetGL> m_renderTarget;
     RenderContext::FrameDescriptor m_screenFrame;
-    std::vector<IAABB> m_clearRects;
     size_t m_pipelineWarmupCount = 0;
-    rcp<RiveRenderImage> m_pipelineWarmupImage;
-    rcp<RenderBuffer> m_pipelineWarmupVertices;
-    rcp<RenderBuffer> m_pipelineWarmupUVs;
-    rcp<RenderBuffer> m_pipelineWarmupIndices;
+    struct
+    {
+        rcp<RiveRenderImage> image;
+        rcp<RenderBuffer> vertices;
+        rcp<RenderBuffer> uvs;
+        rcp<RenderBuffer> indices;
+    } m_pipelineWarmupMesh;
 #ifdef RIVE_CANVAS
     // One entry per canvas pass that is currently open, outermost first. A
     // single slot would do for one cached artboard, but they nest: the inner
@@ -1546,10 +1552,8 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
     class_<WebGL2Renderer, base<Renderer>>("WebGL2Renderer")
         .function("clear", &WebGL2Renderer::clear)
         .function("flush", &WebGL2Renderer::flush)
-        .function("tryFlush", &WebGL2Renderer::tryFlush)
         .function("linkDrawPrograms", &WebGL2Renderer::linkDrawPrograms)
         .function("drawPipelineWarmup", &WebGL2Renderer::drawPipelineWarmup)
-        .function("clearRect", &WebGL2Renderer::clearRect)
         .function("resize", &WebGL2Renderer::resize)
         .function("saveClipRect", &WebGL2Renderer::saveClipRect)
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)

@@ -46,7 +46,6 @@ export interface RiveCanvas {
   RenderPaintStyle: typeof RenderPaintStyle;
   StrokeCap: typeof StrokeCap;
   StrokeJoin: typeof StrokeJoin;
-  SurfaceMaterial: typeof SurfaceMaterial;
   decodeAudio: DecodeAudio;
   decodeImage: DecodeImage;
   decodeFont: DecodeFont;
@@ -214,8 +213,6 @@ export declare class RendererWrapper {
    */
   restore(): void;
   transform(tranform: Mat2D): void;
-  /** Multiplies opacity for subsequent draws within the saved state. */
-  modulateOpacity(opacity: number): void;
   drawPath(path: RenderPath, paint: RenderPaint): void;
   clipPath(path: RenderPath): void;
   /**
@@ -236,35 +233,20 @@ export declare class RendererWrapper {
   delete(): void;
   flush(): void;
   /**
-   * Draws the recorded WebGL2 frame only if every program it needs has finished
-   * linking. Otherwise draws nothing, leaves the target untouched, starts the
-   * missing links in the background, and returns how many programs are pending.
-   * Returns 0 when drawn. Either way the recorded frame is consumed, as with
-   * flush(). Without KHR_parallel_shader_compile this is flush() and returns 0.
-   */
-  tryFlush(): number;
-  /**
-   * WebGL2 only. Starts Magic Garden's depth-stencil draw-program links in the
+   * WebGL2 only. Starts linking the programs drawPipelineWarmup() draws, in the
    * background with KHR_parallel_shader_compile, without reading link status.
-   * Without the extension, links synchronously. Does not draw or consume a frame.
-   * tryFlush() polls and finishes only the programs its recorded frame needs.
+   * Without the extension, links synchronously. Draws nothing.
    */
   linkDrawPrograms(): void;
   /**
    * WebGL2 only. Draws Magic Garden's next draw-pipeline warm-up into the
-   * target, alone in its own frame: with linkDrawPrograms(), the game's whole
-   * set of draw programs and GPU states. On Safari each program's first draw
-   * in each state builds a pipeline, so draw them all before the art. A
-   * warm-up whose programs are still linking draws nothing and stays next.
-   * Returns how many are left. Overwrites the target's pixels.
+   * target, alone in its own frame. The warm-ups draw the game's whole set of
+   * draw programs and GPU states: on Safari each program's first draw in each
+   * state builds a pipeline, so draw them all before the art. A warm-up whose
+   * programs are still linking draws nothing and stays next. Returns how many
+   * are left. Overwrites the target's pixels.
    */
   drawPipelineWarmup(): number;
-  /**
-   * WebGL2 overlay frames only. Records a target rectangle, in saveClipRect
-   * coordinates, to clear to transparent before this frame's draws. A frame
-   * that tryFlush() does not draw clears nothing. Full-clear frames ignore it.
-   */
-  clearRect(left: number, top: number, right: number, bottom: number): void;
   /**
    * Re-binds Rive's internal textures and invalidates the GL state
    * cache. Call before Rive renders when another renderer (e.g.
@@ -312,7 +294,12 @@ export declare class RendererWrapper {
     width: number,
     height: number
   ): ImageInternal;
-  /** Selects the default material for supported subsequent artboard draws. */
+  /**
+   * Selects the material for subsequent vector paths. Images draw plain, and
+   * a value outside SurfaceMaterial draws plain. The box, in target pixels,
+   * is the region the material's pattern spans. A negative `timeSeconds`
+   * draws Gold without its sweep.
+   */
   setSurfaceMaterial(
     material: SurfaceMaterial,
     left: number,
@@ -1346,11 +1333,6 @@ export declare class ViewModelInstanceList extends ViewModelInstanceValue {
 }
 export declare class ViewModelInstanceAssetImage extends ViewModelInstanceValue {
   value(image: ImageInternal | null): void;
-  /**
-   * Selects the material for this image binding. Image meshes and renderer
-   * fallback draws remain unmaterialized.
-   */
-  setSurfaceMaterial(material: SurfaceMaterial): void;
 }
 export declare class ViewModelInstanceAssetFont extends ViewModelInstanceValue {
   value(font: FontInternal | null): void;
@@ -1425,15 +1407,8 @@ export enum DataType {
   artboard = 'artboard',
 }
 
-/** Renderer-native material selected by an artboard or image binding. */
-export enum SurfaceMaterial {
-  /** Draw without a surface material. */
-  None = 0,
-  /** Use the enclosing artboard's material. */
-  Inherit = 3,
-  Rainbow = 2,
-  Gold = 1,
-}
+/** Renderer-native material: 0 draws without one, 1 is Gold, 2 is Rainbow. */
+export type SurfaceMaterial = 0 | 1 | 2;
 
 export enum Fit {
   fill,
