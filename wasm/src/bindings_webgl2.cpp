@@ -1330,6 +1330,8 @@ private:
             // Pixel local storage draws clockwise fills with their own
             // programs.
             clockwise,
+            // Depth-stencil frames draw strokes with their own programs.
+            stroke,
         };
         Paint paint;
         SurfaceMaterial material;
@@ -1375,6 +1377,15 @@ private:
         {PipelineWarmup::Paint::opaque,
          SurfaceMaterial::none,
          PipelineWarmup::Shape::clockwise},
+        {PipelineWarmup::Paint::opaque,
+         SurfaceMaterial::none,
+         PipelineWarmup::Shape::stroke},
+        {PipelineWarmup::Paint::opaque,
+         SurfaceMaterial::gold,
+         PipelineWarmup::Shape::stroke},
+        {PipelineWarmup::Paint::translucent,
+         SurfaceMaterial::none,
+         PipelineWarmup::Shape::stroke},
     };
 
     // Draws one warm-up alone in its own frame. Returns whether it drew.
@@ -1422,7 +1433,15 @@ private:
         else
         {
             rcp<RenderPaint> paint(factory->makeRenderPaint());
-            paint->style(RenderPaintStyle::fill);
+            if (warmup.shape == Shape::stroke)
+            {
+                paint->style(RenderPaintStyle::stroke);
+                paint->thickness(8);
+            }
+            else
+            {
+                paint->style(RenderPaintStyle::fill);
+            }
             paint->color(warmup.paint == Paint::translucent ? 0x80e03080
                                                             : 0xffe04080);
             if (warmup.paint == Paint::screen)

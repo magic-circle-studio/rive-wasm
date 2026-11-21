@@ -43,7 +43,9 @@ The fork adds only what Magic Garden calls:
   own frame, and returns how many are left. Each warm-up is one paint the art
   uses (opaque, translucent, screen blend, gradient or image mesh), plain or
   Gold, under a clip rect, plus clip paths and a clip reset, a fill large
-  enough to draw its interior as triangles, and a clockwise fill. On Safari a
+  enough to draw its interior as triangles, a clockwise fill, and strokes
+  (opaque, Gold and translucent), which depth-stencil frames now draw with
+  their own programs. On Safari a
   program's first draw in each GPU state builds a pipeline, so drawing these
   before the art builds them all. A warm-up whose programs are still linking
   draws nothing and stays next. The runtime supports this with
