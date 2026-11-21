@@ -1487,6 +1487,8 @@ private:
             mesh.uvs = buffer(RenderBufferType::vertex, uvs);
             mesh.indices = buffer(RenderBufferType::index, indices);
         }
+        // The overload with additiveness: the one without it re-dispatches
+        // to our drawImageMesh override, which drops these GL buffers.
         RiveRenderer::drawImageMesh(mesh.image.get(),
                                     ImageSampler::LinearClamp(),
                                     mesh.vertices,
@@ -1495,7 +1497,8 @@ private:
                                     4,
                                     6,
                                     BlendMode::srcOver,
-                                    1);
+                                    1,
+                                    0);
     }
 
     // Returns whether the frame drew.
