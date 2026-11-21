@@ -356,6 +356,20 @@ export declare class RendererWrapper {
     width: number,
     height: number
   ): ImageInternal;
+  /**
+   * Selects the material for subsequent vector paths. Images draw plain, and
+   * a value outside SurfaceMaterial draws plain. The box, in target pixels,
+   * is the region the material's pattern spans. A negative `timeSeconds`
+   * draws Gold without its sweep.
+   */
+  setSurfaceMaterial(
+    material: SurfaceMaterial,
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+    timeSeconds: number
+  ): void;
   translate(x: number, y: number): void;
   rotate(angle: number): void;
   /**
@@ -1659,6 +1673,9 @@ export enum DataType {
   image = 'image',
   artboard = 'artboard',
 }
+
+/** Renderer-native material: 0 draws without one, 1 is Gold, 2 is Rainbow. */
+export type SurfaceMaterial = 0 | 1 | 2;
 
 export enum Fit {
   fill,

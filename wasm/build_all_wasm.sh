@@ -155,6 +155,10 @@ if target_enabled "webgl2"; then
     cp build/webgl2_advanced/bin/${WASM_CONFIG}/webgl2_advanced.wasm ../js/npm/webgl2_advanced/rive.wasm
     cp build/webgl2_advanced/bin/${WASM_CONFIG}/webgl2_advanced.wasm ../js/npm/webgl2/rive.wasm
     cp ../js/src/rive_advanced.mjs.d.ts ../js/npm/webgl2_advanced/rive_advanced.mjs.d.ts
+    node scripts/export_surface_material_shader.mjs \
+        submodules/rive-runtime/renderer/src/shaders/surface_material.glsl \
+        ../js/npm/webgl2_advanced/surface_material_shader.mjs \
+        ../js/npm/webgl2_advanced/surface_material_shader.mjs.d.ts
     verify_fallback webgl2
 fi
 

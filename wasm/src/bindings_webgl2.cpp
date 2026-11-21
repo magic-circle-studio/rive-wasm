@@ -816,6 +816,15 @@ public:
 
     void restoreClipRect() { restore(); }
 
+    void setSurfaceMaterial(uint32_t value, float l, float t, float r, float b, float timeSeconds)
+    {
+        // An unknown material draws plain.
+        auto material = value <= static_cast<uint32_t>(SurfaceMaterial::rainbow)
+                            ? static_cast<SurfaceMaterial>(value)
+                            : SurfaceMaterial::none;
+        RiveRenderer::setSurfaceMaterial(material, AABB(l, t, r, b), timeSeconds);
+    }
+
     void drawImage(const RenderImage* renderImage,
                    const ImageSampler imageSampler,
                    BlendMode blendMode,
@@ -2972,6 +2981,7 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
         .function("deferredActive", &WebGL2Renderer::deferredActive)
 #endif
         .function("restoreClipRect", &WebGL2Renderer::restoreClipRect)
+        .function("setSurfaceMaterial", &WebGL2Renderer::setSurfaceMaterial)
         .function("invalidateGLState", &WebGL2Renderer::invalidateGLState)
         .function("unbindGLInternalResources", &WebGL2Renderer::unbindGLInternalResources)
         .function("beginOverlayFrame", &WebGL2Renderer::beginOverlayFrame)
