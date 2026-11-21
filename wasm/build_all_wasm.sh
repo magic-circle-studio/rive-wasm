@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 # -p          Build with profiling config (--profiling-funcs) instead of release.
@@ -6,7 +6,8 @@ set -e
 # -i          Incremental build. Skips cleaning the build directory so only
 #             changed C++ files are recompiled.
 # -r <targets> For local dev. Comma-separated list of targets to build.
-#             Skips all fallback WASM builds and only compiles the specified targets.
+#             Skips fallback WASM builds and only compiles the specified targets,
+#             except that webgl2 includes its fallback.
 #             Available: canvas, canvas-lite, canvas-single, webgl2,
 #             webgl2-threads (which needs webgl2 built as well)
 # -s          Stage flavors already built by build_flavor.sh instead of
@@ -43,10 +44,11 @@ build() {
 
 # Both wasm binaries share one JS glue, so they must expose the same import and
 # export names and signatures. Verify this when building all wasm.
-# Executes on full builds only -- a -r build has no fallback. One call per
-# build: the base and _advanced packages are handed the same bytes.
+# Executes on full builds and -r webgl2 builds; other -r builds have no
+# fallback. One call per build: the base and _advanced packages are handed the
+# same bytes.
 verify_fallback() {
-    if [ -n "$TARGETS" ]; then
+    if [ -n "$TARGETS" ] && [ "$1" != "webgl2" ]; then
         return 0
     fi
     local pkg="../js/npm/$1"
@@ -79,7 +81,7 @@ rm -f ../js/npm/canvas_lite/*.wasm
 
 rm -f ../js/npm/canvas_single/*.mjs
 
-rm -f ../js/npm/webgl2_advanced/*.mjs
+rm -f ../js/npm/webgl2_advanced/*.mjs*
 rm -f ../js/npm/webgl2_advanced/*.wasm
 
 rm -f ../js/npm/webgl2/*.mjs
@@ -141,7 +143,7 @@ if target_enabled "canvas-single"; then
     cp ../js/src/rive_advanced.mjs.d.ts ../js/npm/canvas_advanced_single/rive_advanced.mjs.d.ts
 fi
 
-if [ -z "$TARGETS" ]; then
+if target_enabled "webgl2"; then
     build webgl2_advanced_fallback
     cp build/webgl2_advanced_fallback/bin/${WASM_CONFIG}/webgl2_advanced.wasm ../js/npm/webgl2_advanced/rive_fallback.wasm
     cp build/webgl2_advanced_fallback/bin/${WASM_CONFIG}/webgl2_advanced.wasm ../js/npm/webgl2/rive_fallback.wasm

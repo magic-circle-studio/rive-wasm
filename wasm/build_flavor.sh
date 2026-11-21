@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 # Builds one wasm flavor into build/<dir>/bin/<config>, where build_all_wasm.sh
@@ -27,8 +27,10 @@ canvas_advanced_single)
     FLAGS="-w -c -s"
     DIR=canvas_advanced_fallback
     ;;
-webgl2_advanced_fallback) FLAGS="-w -c -r webgl2" ;;
-webgl2_advanced) FLAGS="-w -r webgl2" ;;
+# Magic Garden's art runs no wasm script modules, so its WebGL2 package keeps
+# the Luau VM alone (no -w).
+webgl2_advanced_fallback) FLAGS="-c -r webgl2" ;;
+webgl2_advanced) FLAGS="-r webgl2" ;;
 webgl2_threads) FLAGS="-w -m -n -r webgl2" ;;
 *)
     echo "Unknown flavor: $1" >&2
