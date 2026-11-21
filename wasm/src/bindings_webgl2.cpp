@@ -264,11 +264,42 @@ EM_JS(
         }
         var image = new Image();
         images.set(imageID, image);
-        image.src = URL.createObjectURL(blob);
-        image.onload = function()
-        {
-            Module["_setWebImage"](renderImage, image.width, image.height);
-        };
+        // Decode before the first upload so texImage2D does not synchronously
+        // decode the HTMLImageElement. Keep the element for later GL contexts.
+        // WebGL ignores UNPACK_PREMULTIPLY_ALPHA_WEBGL for ImageBitmaps.
+        var bitmapPromise = typeof createImageBitmap === "function"
+            ? createImageBitmap(blob, { premultiplyAlpha: "premultiply" }).catch(function() { return null; })
+            : Promise.resolve(null);
+        var objectUrl = URL.createObjectURL(blob);
+        image["decodePromise"] = new Promise(function(resolve) {
+            image.onload = function()
+            {
+                URL.revokeObjectURL(objectUrl);
+                bitmapPromise.then(function(bitmap) {
+                    if (bitmap)
+                    {
+                        image["bitmap"] = bitmap;
+                    }
+                    // The constructor's decode ref keeps renderImage alive until
+                    // _setWebImage releases it, even if its caller already left.
+                    Module["_setWebImage"](renderImage, image.width, image.height);
+                    resolve(true);
+                });
+            };
+            image.onerror = function()
+            {
+                URL.revokeObjectURL(objectUrl);
+                bitmapPromise.then(function(bitmap) {
+                    if (bitmap)
+                    {
+                        bitmap.close();
+                    }
+                    Module["_setWebImage"](renderImage, 0, 0);
+                    resolve(false);
+                });
+            };
+        });
+        image.src = objectUrl;
     });
 
 #ifdef RIVE_WEBGL2_REPLAY_WORKER
@@ -296,10 +327,16 @@ EM_JS(void, upload_image, (EMSCRIPTEN_WEBGL_CONTEXT_HANDLE gl, uint32_t imageID)
     {
         return;
     }
+    var bitmap = image["bitmap"];
     gl = GL.getContext(gl).GLctx;
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap || image);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    if (bitmap)
+    {
+        bitmap.close();
+        delete image["bitmap"];
+    }
 });
 
 EM_JS(void, delete_image, (uint32_t imageID), {
@@ -309,6 +346,8 @@ EM_JS(void, delete_image, (uint32_t imageID), {
     {
         // The worker's ImageBitmap holds its pixels until closed.
         image.close&& image.close();
+        // So does a decoded bitmap that was never uploaded.
+        image["bitmap"] && image["bitmap"].close();
         images.delete(imageID);
     }
     var blobs = Module["imageBlobs"];
@@ -383,11 +422,12 @@ public:
 
     uint32_t imageID() const { return m_imageID; }
 
+    // A failed decode reports 0x0 and never becomes ready to upload.
     void setWebImage(int width, int height)
     {
         m_Width = width;
         m_Height = height;
-        m_readyToUpload = true;
+        m_readyToUpload = width > 0 && height > 0;
         decodedAsync();
     }
 
@@ -2942,6 +2982,23 @@ EMSCRIPTEN_BINDINGS(RiveWASM_WebGL2)
                   allow_raw_pointers());
     class_<RenderImage>("RenderImage")
         .function("unref", &WebGL2RenderImageWrapper::unref)
+        // Resolves true once the browser has decoded the pixels, or false if
+        // it could not. Images with no browser decode resolve true at once.
+        .function("_decodePromise", optional_override([](RenderImage& self) {
+                      emscripten::val images = emscripten::val::module_property("images");
+                      auto* image = lite_rtti_cast<WebGL2RenderImage*>(&self);
+                      if (image != nullptr && !images.isUndefined())
+                      {
+                          emscripten::val entry =
+                              images.call<emscripten::val>("get", image->imageID());
+                          if (!entry.isUndefined() && !entry["decodePromise"].isUndefined())
+                          {
+                              return entry["decodePromise"];
+                          }
+                      }
+                      return emscripten::val::global("Promise").call<emscripten::val>("resolve",
+                                                                                     true);
+                  }))
         .allow_subclass<WebGL2RenderImageWrapper>("RenderImageWrapper");
 
 #if defined(RIVE_CANVAS) && defined(RIVE_ORE)

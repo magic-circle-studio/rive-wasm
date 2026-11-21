@@ -588,7 +588,8 @@ export class Image {
   get nativeImage(): ImageInternal;
 }
 export interface ImageCallback {
-  (image: Image): void;
+  /** Receives drawable pixels, or null when browser decoding fails. */
+  (image: Image | null): void;
 }
 export interface DecodeImage {
   (
