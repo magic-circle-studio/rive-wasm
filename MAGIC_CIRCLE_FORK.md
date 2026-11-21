@@ -43,11 +43,10 @@ The fork adds only what Magic Garden calls:
   own frame, and returns how many are left. Each warm-up is one paint the art
   uses (opaque, translucent, screen blend, gradient or image mesh), plain or
   Gold, under a clip rect, plus clip paths and a clip reset, a fill large
-  enough to draw its interior as triangles, a clockwise fill, and strokes
-  (opaque, Gold and translucent), which depth-stencil frames now draw with
-  their own programs. On Safari a
-  program's first draw in each GPU state builds a pipeline, so drawing these
-  before the art builds them all. A warm-up whose programs are still linking
+  enough to draw its interior as triangles, a clockwise fill, and Gold and
+  translucent strokes, which depth-stencil frames now draw with their own
+  program (see below). On Safari a program's first draw in each GPU state
+  builds a pipeline, so drawing these before the art builds them all. A warm-up whose programs are still linking
   draws nothing and stays next. The runtime supports this with
   `RenderContext::flush(resources, PendingPrograms)`, and the blit-as-draw
   program that overlay frames use links in the background like the others.
@@ -57,6 +56,24 @@ The fork adds only what Magic Garden calls:
 
 Upstream defaults stay as upstream ships them: deferred decoding and inkbleed
 (with its new shrinkbleed inset) are off unless a caller asks.
+
+### Added in 2.54.0-mc.2
+
+- **`setLayerAccumulatorEnabled(enabled)`** on the module sets
+  `StateMachineInstance::sm_layerAccumulatorEnabled` for state machine
+  instances made from then on. Upstream's layer accumulator (#15302) has each
+  new instance track every property two of its layers key. That makes an
+  avatar instance about 1.5x to 6x slower to create (more for the first one
+  per file, which also scans the machine) and buys Magic Garden's art no
+  advance time. Off draws identical pixels. On by default, as upstream ships
+  it; the game turns it off.
+- **One depth-stencil stroke program.** Upstream draws depth-stencil strokes
+  with their own `DS_POLAR_STROKE` program, so plain and Gold strokes would
+  each link one. Strokes keep the material (HSL) feature in their
+  ubershader, so both share one program: one link fewer before the loading
+  animation where every link blocks. Plain strokes run the material code
+  with no material, one path-record fetch per vertex and a branch per
+  fragment.
 
 ## Build
 
