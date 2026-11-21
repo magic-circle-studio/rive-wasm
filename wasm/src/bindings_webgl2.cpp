@@ -1377,9 +1377,8 @@ private:
         {PipelineWarmup::Paint::opaque,
          SurfaceMaterial::none,
          PipelineWarmup::Shape::clockwise},
-        {PipelineWarmup::Paint::opaque,
-         SurfaceMaterial::none,
-         PipelineWarmup::Shape::stroke},
+        // Plain and Gold strokes share one program (see
+        // UbershaderFeaturesMaskFor), so Gold warms both.
         {PipelineWarmup::Paint::opaque,
          SurfaceMaterial::gold,
          PipelineWarmup::Shape::stroke},
