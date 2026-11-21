@@ -671,6 +671,14 @@ EMSCRIPTEN_BINDINGS(RiveWASM)
     function("computeAlignment", &computeAlignment);
     function("mapXY", &mapXY);
     function("hasListeners", &hasListeners, allow_raw_pointers());
+    // Whether state machine instances made from here on collect the
+    // properties several of their layers key and set each once a frame
+    // (StateMachine::layerConflicts). On by default; the setup costs each new
+    // instance a write tracker per such property.
+    function("setLayerAccumulatorEnabled",
+             optional_override([](bool enabled) {
+                 rive::StateMachineInstance::sm_layerAccumulatorEnabled = enabled;
+             }));
 
 #ifdef ENABLE_QUERY_FLAT_VERTICES
     class_<rive::FlattenedPath>("FlattenedPath")

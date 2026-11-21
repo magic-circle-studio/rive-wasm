@@ -66,6 +66,13 @@ export interface RiveCanvas {
   // The preferred languages text without a language of its own shapes and
   // falls back with, most preferred first.
   setSystemLanguages: (languages: string[]) => void;
+  /**
+   * Whether state machine instances made from here on collect the properties
+   * several of their layers key and set each once a frame. On by default;
+   * off applies each layer's writes straight to the objects. The setup costs
+   * each new instance a write tracker per such property.
+   */
+  setLayerAccumulatorEnabled(enabled: boolean): void;
 
   /**
    * @experimental Creates a deferred recording session. Only present in builds
