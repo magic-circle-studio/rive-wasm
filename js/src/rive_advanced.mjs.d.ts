@@ -310,6 +310,21 @@ export declare class RendererWrapper {
   delete(): void;
   flush(): void;
   /**
+   * WebGL2 only. Starts linking the programs drawPipelineWarmup() draws, in the
+   * background with KHR_parallel_shader_compile, without reading link status.
+   * Without the extension, links synchronously. Draws nothing.
+   */
+  linkDrawPrograms(): void;
+  /**
+   * WebGL2 only. Draws Magic Garden's next draw-pipeline warm-up into the
+   * target, alone in its own frame. The warm-ups draw the game's whole set of
+   * draw programs and GPU states: on Safari each program's first draw in each
+   * state builds a pipeline, so draw them all before the art. A warm-up whose
+   * programs are still linking draws nothing and stays next. Returns how many
+   * are left. Overwrites the target's pixels.
+   */
+  drawPipelineWarmup(): number;
+  /**
    * Re-binds Rive's internal textures and invalidates the GL state
    * cache. Call before Rive renders when another renderer (e.g.
    * PixiJS) has been using the shared WebGL context.
