@@ -148,14 +148,17 @@ Module["onRuntimeInitialized"] = function () {
     renderer._gl = gl;
     // Re-bind our context before any teardown that routes into glDelete*, which
     // deref the *current* GLctx.
-    renderer.bindContext = function () {
+    renderer["bindContext"] = function () {
       if (this._handle) {
         GL.makeContextCurrent(this._handle);
       }
     };
-    var nativeDelete = renderer.delete;
-    renderer.delete = function () {
-      this.bindContext();
+    var nativeDelete = renderer["delete"];
+    renderer["delete"] = function () {
+      this["bindContext"]();
+      releaseGLTexture(this._externalTextureGLId);
+      (this._externalImageTextureGLIds || []).forEach(releaseGLTexture);
+      this._externalTextureGLId = this._externalImageTextureGLIds = null;
       nativeDelete.call(this);
       GL.deleteContext(this._handle);
       this._handle = this._canvas = this._width = this._height = this._gl = null;
@@ -170,7 +173,7 @@ Module["onRuntimeInitialized"] = function () {
   // lost context. Unreleased, it counts toward the page's context limit until GC.
   function releaseHiddenGLRenderer(renderer) {
     const gl = renderer._gl;
-    renderer.delete();
+    renderer["delete"]();
     const ext = gl.getExtension("WEBGL_lose_context");
     ext && ext["loseContext"]();
   }
@@ -178,6 +181,12 @@ Module["onRuntimeInitialized"] = function () {
   const makeRenderer = Module.makeRenderer;
   Module.makeRenderer = function (canvas, useOffScreenRenderer, options) {
     const inkbleed = !!(options && options["inkbleed"]);
+    if (!useOffScreenRenderer) {
+      // Magic Garden's canvas already has Pixi's context, which ignores the
+      // antialias choice; the probe below would only add a context and link
+      // its programs.
+      return makeGLRenderer(canvas, /*enableMSAA =*/ false, inkbleed);
+    }
     if (!_offscreenGL) {
       function MakeOffscreenGL(enableMSAA) {
         const offscreenCanvas = document.createElement("canvas");
@@ -211,16 +220,9 @@ Module["onRuntimeInitialized"] = function () {
         throw "Unable to create WebGL context, your environment may not support WebGL. Try out @rive-app/canvas as an alternative.";
       }
     }
-    if (useOffScreenRenderer) {
-      // No attachSession: offscreen renderers share one GL context across
-      // canvases, which a session cannot record for.
-      return new OffscreenRenderer(canvas);
-    }
-    return makeGLRenderer(
-      canvas,
-      /*enableMSAA =*/ _offscreenGL._enableAntialiasCanvas,
-      inkbleed
-    );
+    // No attachSession: offscreen renderers share one GL context across
+    // canvases, which a session cannot record for.
+    return new OffscreenRenderer(canvas);
   };
 
   const nativeDelete = Module["Artboard"]["prototype"]["delete"];
@@ -463,12 +465,68 @@ Module["onRuntimeInitialized"] = function () {
     );
   };
 
+  function beginFrame(renderer) {
+    GL.makeContextCurrent(renderer._handle);
+    if (!renderer._externalTextureGLId) {
+      riveSyncRendererSize(renderer);
+    }
+  }
+
   const cppClear = Module["WebGL2Renderer"]["prototype"]["clear"];
   Module["WebGL2Renderer"]["prototype"]["clear"] = function () {
-    GL.makeContextCurrent(this._handle);
-    riveSyncRendererSize(this);
+    beginFrame(this);
     cppClear.call(this);
   };
+
+  const cppBeginOverlayFrame = Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"];
+  Module["WebGL2Renderer"]["prototype"]["beginOverlayFrame"] = function () {
+    beginFrame(this);
+    cppBeginOverlayFrame.call(this);
+  };
+
+  // Give the texture an Emscripten GL id for C++.
+  function registerGLTexture(webglTexture) {
+    var id = GL.getNewId(GL.textures);
+    GL.textures[id] = webglTexture;
+    return id;
+  }
+
+  function releaseGLTexture(id) {
+    if (id) {
+      GL.textures[id] = null;
+    }
+  }
+
+  const cppSetTargetTexture = Module["WebGL2Renderer"]["prototype"]["_setTargetTexture"];
+  const cppClearTargetTexture = Module["WebGL2Renderer"]["prototype"]["_clearTargetTexture"];
+
+  Module["WebGL2Renderer"]["prototype"]["setTargetTexture"] = function (webglTexture, width, height) {
+    GL.makeContextCurrent(this._handle);
+    releaseGLTexture(this._externalTextureGLId);
+    this._externalTextureGLId = registerGLTexture(webglTexture);
+    cppSetTargetTexture.call(this, this._externalTextureGLId, width, height);
+  };
+
+  Module["WebGL2Renderer"]["prototype"]["clearTargetTexture"] = function () {
+    GL.makeContextCurrent(this._handle);
+    cppClearTargetTexture.call(this);
+    releaseGLTexture(this._externalTextureGLId);
+    this._externalTextureGLId = null;
+  };
+
+  const cppMakeImageFromGLTexture =
+    Module["WebGL2Renderer"]["prototype"]["_makeImageFromGLTexture"];
+
+  Module["WebGL2Renderer"]["prototype"]["makeImageFromGLTexture"] =
+    function (webglTexture, width, height) {
+      GL.makeContextCurrent(this._handle);
+      var id = registerGLTexture(webglTexture);
+      if (!this._externalImageTextureGLIds) {
+        this._externalImageTextureGLIds = [];
+      }
+      this._externalImageTextureGLIds.push(id);
+      return cppMakeImageFromGLTexture.call(this, id, width, height);
+    };
 
   // Pass the session of the deferred file this image is bound into; an image
   // decoded against any other factory is dropped when that file draws.
