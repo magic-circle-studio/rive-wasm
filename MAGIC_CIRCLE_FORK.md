@@ -30,6 +30,9 @@ The fork adds only what Magic Garden calls:
 - **A lean renderer:** ubershaders only. Rive draws with pixel local storage
   where the context exposes `WEBGL_shader_pixel_local_storage` (Chrome turns
   it on by default from M158), and in depth-stencil (MSAA) mode elsewhere.
+  Intel GPUs older than Gen 9 on ANGLE's Direct3D 11 backend also draw with
+  MSAA: their drivers advertise coherent pixel local storage, but the GPU
+  process dies within seconds of the first frames.
   Depth-stencil programs leave rarely used features out unless a draw
   requests them, and images draw as cached image quads, sharing the
   image-mesh programs.
