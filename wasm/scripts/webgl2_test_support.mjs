@@ -14,7 +14,13 @@ export async function findChrome() {
   throw new Error("Chrome was not found. Set CHROME_BIN to its executable.");
 }
 
-export function pathFixture({ screen = false, feather = false, meshPNG = null, imagePNG = null, pathReference = false, unitMesh = false, clip = true } = {}) {
+/**
+ * Writes a tiny, deterministic RIVE v7 file with generated core keys, so the
+ * browser test needs no art assets. One 256x256 artboard holds a solid path
+ * (optionally screen-blended), an image quad, an authored image mesh, or the
+ * solid path equivalent to the image quad; `opacity` applies to the artboard.
+ */
+export function pathFixture({ screen = false, meshPNG = null, imagePNG = null, pathReference = false, clip = true, opacity = 1 } = {}) {
   const bytes = [...new TextEncoder().encode("RIVE"), 7, 0, 0, 0];
   const uint = (value) => {
     do {
@@ -43,6 +49,7 @@ export function pathFixture({ screen = false, feather = false, meshPNG = null, i
   }
   uint(1); prop(7, 256, "float"); prop(8, 256, "float");
   if (!clip) prop(196, 0); // LayoutComponent::clip.
+  if (opacity !== 1) prop(18, opacity, "float"); // WorldTransformComponent::opacity.
   uint(0);
   if (imagePNG && pathReference) {
     uint(3); prop(5, 0); prop(13, 176, "float"); prop(14, 176, "float"); uint(0);
@@ -57,10 +64,8 @@ export function pathFixture({ screen = false, feather = false, meshPNG = null, i
     uint(100); prop(5, 0); prop(206, 0); prop(13, 176, "float"); prop(14, 176, "float"); prop(380, 0, "float"); prop(381, 0, "float"); uint(0);
     if (imagePNG) return new Uint8Array(bytes);
     uint(109); prop(5, 1); prop(223, [0, 1, 2, 0, 2, 3], "bytes"); uint(0);
-    const vertices = unitMesh
-      ? [[0, 0, 0, 0], [32, 0, 1, 0], [32, 32, 1, 1], [0, 32, 0, 1]]
-      : [[-32, -32, 0, 0], [32, -32, 1, 0], [32, 32, 1, 1], [-32, 32, 0, 1]];
-    for (const [x, y, u, v] of vertices) {
+    // The same unit quad that the image quad draws.
+    for (const [x, y, u, v] of [[0, 0, 0, 0], [32, 0, 1, 0], [32, 32, 1, 1], [0, 32, 0, 1]]) {
       uint(108); prop(5, 2); prop(24, x, "float"); prop(25, y, "float");
       prop(215, u, "float"); prop(216, v, "float"); uint(0);
     }
@@ -69,12 +74,8 @@ export function pathFixture({ screen = false, feather = false, meshPNG = null, i
   uint(3); prop(5, 0); prop(13, 48, "float"); prop(14, 64, "float"); uint(0);
   uint(7); prop(5, 1); prop(20, 48, "float"); prop(21, 32, "float"); uint(0);
   uint(20); prop(5, 1);
-  if (feather) prop(40, 2); // FillRule::clockwise is required for feather fills.
   if (screen) prop(747, 14); // BlendMode::screen.
   uint(0);
   uint(18); prop(5, 3); prop(37, 0xffe04080, "color"); uint(0);
-  if (feather) {
-    uint(533); prop(5, 3); prop(749, 8, "float"); uint(0);
-  }
   return new Uint8Array(bytes);
 }
